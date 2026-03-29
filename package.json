@@ -1,0 +1,14 @@
+{
+  "name": "html-visual-editor",
+  "version": "1.0.0",
+  "description": "HTML 原型可视化编辑工具 - 不写代码也能修改原型",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "open": "^10.1.0"
+  }
+}

@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HTML 原型可视化编辑工具</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ===== 全局变量与重置 ===== */
+:root {
+  --bg-primary: #0f1117;
+  --bg-secondary: #1a1d27;
+  --bg-tertiary: #242836;
+  --bg-hover: #2d3245;
+  --border-color: #2e3348;
+  --text-primary: #e8eaed;
+  --text-secondary: #9aa0b4;
+  --text-muted: #6b7280;
+  --accent: #6c5ce7;
+  --accent-hover: #7c6ff7;
+  --accent-glow: rgba(108, 92, 231, 0.3);
+  --success: #00b894;
+  --warning: #fdcb6e;
+  --danger: #e17055;
+  --radius: 8px;
+  --transition: 0.2s ease;
+  --sidebar-width: 260px;
+  --panel-width: 280px;
+  --toolbar-height: 52px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  height: 100vh;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* ===== 滚动条 ===== */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ===== 主布局 ===== */
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ===== 顶部工具栏 ===== */
+.toolbar {
+  height: var(--toolbar-height);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 8px;
+  flex-shrink: 0;
+  z-index: 100;
+}
+
+.toolbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 16px;
+  border-right: 1px solid var(--border-color);
+  margin-right: 8px;
+}
+
+.toolbar-brand svg { width: 24px; height: 24px; }
+.toolbar-brand span {
+  font-weight: 600;
+  font-size: 14px;
+  background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 28px;
+  background: var(--border-color);
+  margin: 0 8px;
+}
+
+.tb-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+
+.tb-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.tb-btn:active { transform: scale(0.96); }
+.tb-btn.primary { background: var(--accent); color: #fff; }
+.tb-btn.primary:hover { background: var(--accent-hover); box-shadow: 0 0 12px var(--accent-glow); }
+.tb-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.tb-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+.toolbar-spacer { flex: 1; }
+
+.toolbar-file-name {
+  font-size: 13px;
+  color: var(--text-muted);
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.toolbar-file-name.active { color: var(--text-primary); }
+
+/* ===== 主体区域 ===== */
+.main-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ===== 左侧文件面板 ===== */
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  transition: width var(--transition);
+}
+
+.sidebar.collapsed { width: 0; overflow: hidden; border: none; }
+
+.sidebar-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebar-header h3 {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+.dir-input-wrap {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.dir-input-row {
+  display: flex;
+  gap: 6px;
+}
+
+.dir-input {
+  flex: 1;
+  height: 32px;
+  padding: 0 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--transition);
+}
+.dir-input:focus { border-color: var(--accent); }
+.dir-input::placeholder { color: var(--text-muted); }
+
+.dir-btn {
+  height: 32px;
+  padding: 0 10px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all var(--transition);
+}
+.dir-btn:hover { background: var(--accent-hover); }
+
+.file-tree {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+  transition: all var(--transition);
+  border-left: 3px solid transparent;
+}
+.file-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.file-item.active {
+  background: rgba(108, 92, 231, 0.1);
+  color: var(--accent);
+  border-left-color: var(--accent);
+}
+.file-item .icon { font-size: 15px; flex-shrink: 0; }
+.file-item .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.file-tree-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* ===== 中间画布区域 ===== */
+.canvas-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  overflow: hidden;
+  position: relative;
+}
+
+.canvas-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow: auto;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(108, 92, 231, 0.03) 0%, transparent 70%),
+    repeating-linear-gradient(0deg, transparent, transparent 19px, rgba(255,255,255,0.02) 19px, rgba(255,255,255,0.02) 20px),
+    repeating-linear-gradient(90deg, transparent, transparent 19px, rgba(255,255,255,0.02) 19px, rgba(255,255,255,0.02) 20px);
+}
+
+.canvas-frame {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05);
+  overflow: hidden;
+  transition: width 0.3s ease, height 0.3s ease;
+  position: relative;
+}
+
+.canvas-frame iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  gap: 16px;
+}
+.empty-state svg { width: 64px; height: 64px; opacity: 0.3; }
+.empty-state p { font-size: 14px; }
+.empty-state .hint { font-size: 12px; opacity: 0.6; }
+
+/* 设备切换栏 */
+.device-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 0;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+}
+
+.device-btn {
+  padding: 4px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all var(--transition);
+}
+.device-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
+.device-btn.active { color: var(--accent); background: rgba(108, 92, 231, 0.15); }
+
+/* ===== 右侧属性面板 ===== */
+.panel {
+  width: var(--panel-width);
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow-y: auto;
+  transition: width var(--transition);
+}
+
+.panel.collapsed { width: 0; overflow: hidden; border: none; }
+
+.panel-section {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.panel-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.panel-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.panel-row:last-child { margin-bottom: 0; }
+
+.panel-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-width: 48px;
+  flex-shrink: 0;
+}
+
+.panel-input {
+  flex: 1;
+  height: 30px;
+  padding: 0 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--transition);
+}
+.panel-input:focus { border-color: var(--accent); }
+
+.panel-color-input {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  padding: 2px;
+  background: var(--bg-tertiary);
+  cursor: pointer;
+}
+
+.panel-select {
+  flex: 1;
+  height: 30px;
+  padding: 0 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+}
+
+.panel-textarea {
+  width: 100%;
+  min-height: 60px;
+  padding: 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  resize: vertical;
+  transition: border-color var(--transition);
+}
+.panel-textarea:focus { border-color: var(--accent); }
+
+.panel-empty {
+  padding: 40px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+/* 四向间距输入 */
+.spacing-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.spacing-grid .panel-input { text-align: center; }
+
+/* ===== Toast 通知 ===== */
+.toast-container {
+  position: fixed;
+  top: 60px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toast {
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #fff;
+  animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.5s forwards;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+.toast.success { background: var(--success); }
+.toast.error { background: var(--danger); }
+.toast.info { background: var(--accent); }
+
+@keyframes slideIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+</style>
+</head>
+<body>
+
+<div class="app-layout">
+  <!-- ===== 顶部工具栏 ===== -->
+  <div class="toolbar">
+    <div class="toolbar-brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#6c5ce7">
+        <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/>
+        <line x1="12" y1="22" x2="12" y2="15.5"/>
+        <polyline points="22 8.5 12 15.5 2 8.5"/>
+        <polyline points="2 15.5 12 8.5 22 15.5"/>
+        <line x1="12" y1="2" x2="12" y2="8.5"/>
+      </svg>
+      <span>HTML 编辑器</span>
+    </div>
+
+    <div class="toolbar-group">
+      <button class="tb-btn" onclick="toggleSidebar()" title="切换文件面板">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="18" rx="1"/></svg>
+      </button>
+    </div>
+
+    <div class="toolbar-divider"></div>
+
+    <div class="toolbar-group">
+      <button class="tb-btn" id="btnUndo" onclick="doUndo()" disabled title="撤销 (Ctrl+Z)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+      </button>
+      <button class="tb-btn" id="btnRedo" onclick="doRedo()" disabled title="重做 (Ctrl+Y)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10"/></svg>
+      </button>
+    </div>
+
+    <div class="toolbar-divider"></div>
+
+    <span class="toolbar-file-name" id="currentFileName">未打开文件</span>
+
+    <div class="toolbar-spacer"></div>
+
+    <div class="toolbar-group">
+      <button class="tb-btn primary" id="btnSave" onclick="doSave()" disabled title="保存 (Ctrl+S)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        保存
+      </button>
+    </div>
+
+    <div class="toolbar-divider"></div>
+
+    <button class="tb-btn" onclick="togglePanel()" title="切换属性面板">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+    </button>
+  </div>
+
+  <!-- ===== 主体 ===== -->
+  <div class="main-body">
+
+    <!-- 左侧文件面板 -->
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h3>📂 文件浏览</h3>
+      </div>
+      <div class="dir-input-wrap">
+        <div class="dir-input-row">
+          <input type="text" class="dir-input" id="dirInput" placeholder="输入目录路径，如 C:\projects" />
+          <button class="dir-btn" onclick="loadDirectory()">打开</button>
+        </div>
+      </div>
+      <div class="file-tree" id="fileTree">
+        <div class="file-tree-empty">
+          输入目录路径并点击"打开"<br>开始浏览 HTML 文件
+        </div>
+      </div>
+    </div>
+
+    <!-- 中间画布 -->
+    <div class="canvas-area">
+      <div class="canvas-wrapper" id="canvasWrapper">
+        <div class="empty-state" id="emptyState">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
+          <p>从左侧选择一个 HTML 文件开始编辑</p>
+          <span class="hint">支持点选元素、修改文字、调整样式</span>
+        </div>
+        <div class="canvas-frame" id="canvasFrame" style="display:none; width:1200px; height:800px;">
+          <iframe id="previewFrame" sandbox="allow-same-origin allow-scripts"></iframe>
+        </div>
+      </div>
+      <div class="device-bar">
+        <button class="device-btn active" onclick="setDevice(this,1200,800)">💻 桌面</button>
+        <button class="device-btn" onclick="setDevice(this,768,1024)">📱 平板</button>
+        <button class="device-btn" onclick="setDevice(this,375,812)">📲 手机</button>
+        <button class="device-btn" onclick="setDevice(this,'100%','100%')">↔ 自适应</button>
+      </div>
+    </div>
+
+    <!-- 右侧属性面板 -->
+    <div class="panel" id="panel">
+      <div class="panel-empty" id="panelEmpty">
+        <p>🎯 点击画布中的元素<br>即可在此编辑属性</p>
+      </div>
+      <div id="panelContent" style="display:none;">
+
+        <!-- 元素信息 -->
+        <div class="panel-section">
+          <div class="panel-section-title">元素信息</div>
+          <div class="panel-row">
+            <span class="panel-label">标签</span>
+            <input class="panel-input" id="propTag" readonly />
+          </div>
+          <div class="panel-row">
+            <span class="panel-label">ID</span>
+            <input class="panel-input" id="propId" readonly />
+          </div>
+          <div class="panel-row">
+            <span class="panel-label">Class</span>
+            <input class="panel-input" id="propClass" readonly />
+          </div>
+        </div>
+
+        <!-- 文字内容 -->
+        <div class="panel-section">
+          <div class="panel-section-title">文字内容</div>
+          <textarea class="panel-textarea" id="propText" placeholder="双击画布元素也可直接编辑"></textarea>
+        </div>
+
+        <!-- 排版 -->
+        <div class="panel-section">
+          <div class="panel-section-title">排版</div>
+          <div class="panel-row">
+            <span class="panel-label">字号</span>
+            <input class="panel-input" id="propFontSize" type="number" min="0" step="1" placeholder="16" />
+            <span style="color:var(--text-muted);font-size:12px">px</span>
+          </div>
+          <div class="panel-row">
+            <span class="panel-label">行高</span>
+            <input class="panel-input" id="propLineHeight" type="text" placeholder="1.5" />
+          </div>
+          <div class="panel-row">
+            <span class="panel-label">字重</span>
+            <select class="panel-select" id="propFontWeight">
+              <option value="">-</option>
+              <option value="normal">Normal (400)</option>
+              <option value="500">Medium (500)</option>
+              <option value="600">Semi Bold (600)</option>
+              <option value="bold">Bold (700)</option>
+            </select>
+          </div>
+          <div class="panel-row">
+            <span class="panel-label">对齐</span>
+            <select class="panel-select" id="propTextAlign">
+              <option value="">-</option>
+              <option value="left">左对齐</option>
+              <option value="center">居中</option>
+              <option value="right">右对齐</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 颜色 -->
+        <div class="panel-section">
+          <div class="panel-section-title">颜色</div>
+          <div class="panel-row">
+            <span class="panel-label">文字</span>
+            <input type="color" class="panel-color-input" id="propColor" />
+            <input class="panel-input" id="propColorText" placeholder="#000000" />
+          </div>
+          <div class="panel-row">
+            <span class="panel-label">背景</span>
+            <input type="color" class="panel-color-input" id="propBgColor" />
+            <input class="panel-input" id="propBgColorText" placeholder="transparent" />
+          </div>
+        </div>
+
+        <!-- 间距 -->
+        <div class="panel-section">
+          <div class="panel-section-title">外边距 (Margin)</div>
+          <div class="spacing-grid">
+            <input class="panel-input" id="propMarginTop" type="number" placeholder="上" data-prop="marginTop" />
+            <input class="panel-input" id="propMarginRight" type="number" placeholder="右" data-prop="marginRight" />
+            <input class="panel-input" id="propMarginBottom" type="number" placeholder="下" data-prop="marginBottom" />
+            <input class="panel-input" id="propMarginLeft" type="number" placeholder="左" data-prop="marginLeft" />
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <div class="panel-section-title">内边距 (Padding)</div>
+          <div class="spacing-grid">
+            <input class="panel-input" id="propPaddingTop" type="number" placeholder="上" data-prop="paddingTop" />
+            <input class="panel-input" id="propPaddingRight" type="number" placeholder="右" data-prop="paddingRight" />
+            <input class="panel-input" id="propPaddingBottom" type="number" placeholder="下" data-prop="paddingBottom" />
+            <input class="panel-input" id="propPaddingLeft" type="number" placeholder="左" data-prop="paddingLeft" />
+          </div>
+        </div>
+
+        <!-- 尺寸 -->
+        <div class="panel-section">
+          <div class="panel-section-title">尺寸</div>
+          <div class="panel-row">
+            <span class="panel-label">宽度</span>
+            <input class="panel-input" id="propWidth" type="text" placeholder="auto" />
+          </div>
+          <div class="panel-row">
+            <span class="panel-label">高度</span>
+            <input class="panel-input" id="propHeight" type="text" placeholder="auto" />
+          </div>
+        </div>
+
+        <!-- 边框 -->
+        <div class="panel-section">
+          <div class="panel-section-title">边框</div>
+          <div class="panel-row">
+            <span class="panel-label">圆角</span>
+            <input class="panel-input" id="propBorderRadius" type="text" placeholder="0px" />
+          </div>
+          <div class="panel-row">
+            <span class="panel-label">边框</span>
+            <input class="panel-input" id="propBorder" type="text" placeholder="none" />
+          </div>
+        </div>
+
+        <!-- 显示 -->
+        <div class="panel-section">
+          <div class="panel-section-title">显示与可见</div>
+          <div class="panel-row">
+            <span class="panel-label">display</span>
+            <select class="panel-select" id="propDisplay">
+              <option value="">-</option>
+              <option value="block">block</option>
+              <option value="inline-block">inline-block</option>
+              <option value="flex">flex</option>
+              <option value="inline-flex">inline-flex</option>
+              <option value="grid">grid</option>
+              <option value="none">none (隐藏)</option>
+            </select>
+          </div>
+          <div class="panel-row">
+            <span class="panel-label">opacity</span>
+            <input class="panel-input" id="propOpacity" type="number" min="0" max="1" step="0.1" placeholder="1" />
+          </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="panel-section" style="border-bottom:none;">
+          <button class="tb-btn" onclick="deleteSelected()" style="width:100%;justify-content:center;color:var(--danger);border:1px solid var(--danger);border-radius:6px;">
+            🗑️ 删除元素
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Toast 通知容器 -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ===================================================================
+//  全局状态
+// ===================================================================
+let currentFilePath = null;       // 当前编辑的文件路径
+let selectedElement = null;       // 当前选中的 iframe 内元素
+let currentDir = null;            // 当前浏览的目录
+let undoStack = [];               // 撤销栈
+let redoStack = [];               // 重做栈
+let isDirty = false;              // 是否有未保存的修改
+
+// ===================================================================
+//  工具函数
+// ===================================================================
+function showToast(msg, type = 'info') {
+  const c = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+function $(id) { return document.getElementById(id); }
+
+function toggleSidebar() {
+  $('sidebar').classList.toggle('collapsed');
+}
+
+function togglePanel() {
+  $('panel').classList.toggle('collapsed');
+}
+
+// ===================================================================
+//  文件浏览
+// ===================================================================
+// 从当前地址栏获取默认路径或用空
+$('dirInput').addEventListener('keydown', e => { if (e.key === 'Enter') loadDirectory(); });
+
+async function loadDirectory(dir) {
+  const dirPath = dir || $('dirInput').value.trim();
+  if (!dirPath) { showToast('请输入目录路径', 'error'); return; }
+
+  try {
+    const res = await fetch('/api/files?dir=' + encodeURIComponent(dirPath));
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error, 'error'); return; }
+
+    currentDir = data.dir;
+    $('dirInput').value = data.dir;
+    renderFileTree(data.items, data.dir);
+  } catch (e) {
+    showToast('连接服务器失败', 'error');
+  }
+}
+
+function renderFileTree(items, parentDir) {
+  const tree = $('fileTree');
+  if (!items.length) {
+    tree.innerHTML = '<div class="file-tree-empty">此目录下没有 HTML 文件</div>';
+    return;
+  }
+
+  // 添加返回上级
+  let html = '';
+  const parent = parentDir.replace(/\\/g, '/');
+  const parentParts = parent.split('/');
+  if (parentParts.length > 1) {
+    const upDir = parentParts.slice(0, -1).join('/');
+    html += `<div class="file-item" onclick="loadDirectory('${upDir.replace(/'/g, "\\'")}')">
+      <span class="icon">⬆️</span><span class="name">.. 返回上级</span>
+    </div>`;
+  }
+
+  for (const item of items) {
+    const escapedPath = item.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    if (item.type === 'directory') {
+      html += `<div class="file-item" onclick="loadDirectory('${escapedPath}')">
+        <span class="icon">📁</span><span class="name">${item.name}</span>
+      </div>`;
+    } else {
+      html += `<div class="file-item" data-path="${item.path}" onclick="openFile('${escapedPath}')">
+        <span class="icon">📄</span><span class="name">${item.name}</span>
+      </div>`;
+    }
+  }
+  tree.innerHTML = html;
+}
+
+// ===================================================================
+//  打开文件 / 渲染预览
+// ===================================================================
+async function openFile(filePath) {
+  if (isDirty) {
+    if (!confirm('当前文件有未保存的修改，是否放弃？')) return;
+  }
+
+  try {
+    const res = await fetch('/api/file?path=' + encodeURIComponent(filePath));
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error, 'error'); return; }
+
+    currentFilePath = data.path;
+    isDirty = false;
+    undoStack = [];
+    redoStack = [];
+    updateUndoRedoButtons();
+
+    // 更新文件名显示
+    const fileName = data.path.split(/[\\\/]/).pop();
+    $('currentFileName').textContent = fileName;
+    $('currentFileName').classList.add('active');
+    $('btnSave').disabled = false;
+
+    // 高亮当前文件
+    document.querySelectorAll('.file-item').forEach(el => {
+      el.classList.toggle('active', el.dataset.path === data.path);
+    });
+
+    // 加载到 iframe
+    loadPreview(data.path);
+    showToast('已打开: ' + fileName, 'success');
+
+  } catch (e) {
+    showToast('打开文件失败', 'error');
+  }
+}
+
+function loadPreview(filePath) {
+  $('emptyState').style.display = 'none';
+  $('canvasFrame').style.display = 'block';
+
+  const iframe = $('previewFrame');
+  iframe.src = '/preview?path=' + encodeURIComponent(filePath);
+
+  iframe.onload = () => {
+    setupIframeInteraction();
+    clearSelection();
+  };
+}
+
+// ===================================================================
+//  iframe 内交互：选择、编辑、拖拽
+// ===================================================================
+let highlightOverlay = null; // 高亮覆盖层
+
+function setupIframeInteraction() {
+  const iframe = $('previewFrame');
+  const doc = iframe.contentDocument;
+  if (!doc) return;
+
+  // 注入高亮样式
+  const style = doc.createElement('style');
+  style.id = '__editor_style__';
+  style.textContent = `
+    .__editor-selected {
+      outline: 2px solid #6c5ce7 !important;
+      outline-offset: 1px;
+      cursor: move;
+    }
+    .__editor-hover {
+      outline: 1px dashed rgba(108,92,231,0.5) !important;
+      outline-offset: 1px;
+    }
+  `;
+  doc.head.appendChild(style);
+
+  // 点击选择元素
+  doc.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const el = e.target;
+    if (el === doc.body || el === doc.documentElement) {
+      clearSelection();
+      return;
+    }
+
+    selectElement(el);
+  }, true);
+
+  // 悬停高亮
+  doc.addEventListener('mouseover', (e) => {
+    const el = e.target;
+    if (el === selectedElement) return;
+    if (el === doc.body || el === doc.documentElement) return;
+    el.classList.add('__editor-hover');
+  }, true);
+
+  doc.addEventListener('mouseout', (e) => {
+    e.target.classList.remove('__editor-hover');
+  }, true);
+
+  // 双击编辑文字
+  doc.addEventListener('dblclick', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const el = e.target;
+    if (el === doc.body || el === doc.documentElement) return;
+
+    selectElement(el);
+    startInlineEdit(el);
+  }, true);
+
+  // 拖拽逻辑
+  let dragEl = null, dragStartX, dragStartY, origLeft, origTop, origPosition;
+
+  doc.addEventListener('mousedown', (e) => {
+    if (!selectedElement || e.target !== selectedElement) return;
+    if (selectedElement.isContentEditable) return;
+
+    dragEl = selectedElement;
+    const rect = dragEl.getBoundingClientRect();
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+
+    const cs = doc.defaultView.getComputedStyle(dragEl);
+    origPosition = cs.position;
+
+    if (origPosition === 'static') {
+      dragEl.style.position = 'relative';
+    }
+
+    origLeft = parseInt(cs.left) || 0;
+    origTop = parseInt(cs.top) || 0;
+    e.preventDefault();
+  }, true);
+
+  doc.addEventListener('mousemove', (e) => {
+    if (!dragEl) return;
+    const dx = e.clientX - dragStartX;
+    const dy = e.clientY - dragStartY;
+    dragEl.style.left = (origLeft + dx) + 'px';
+    dragEl.style.top = (origTop + dy) + 'px';
+  }, true);
+
+  doc.addEventListener('mouseup', () => {
+    if (dragEl) {
+      pushUndo();
+      markDirty();
+      updatePanel();
+      dragEl = null;
+    }
+  }, true);
+}
+
+// ===================================================================
+//  元素选择 & 属性面板
+// ===================================================================
+function selectElement(el) {
+  const doc = $('previewFrame').contentDocument;
+  if (!doc) return;
+
+  // 清除之前的选中
+  doc.querySelectorAll('.__editor-selected').forEach(e => e.classList.remove('__editor-selected'));
+
+  selectedElement = el;
+  el.classList.add('__editor-selected');
+  el.classList.remove('__editor-hover');
+
+  // 显示属性面板
+  $('panelEmpty').style.display = 'none';
+  $('panelContent').style.display = 'block';
+
+  updatePanel();
+}
+
+function clearSelection() {
+  const doc = $('previewFrame').contentDocument;
+  if (doc) {
+    doc.querySelectorAll('.__editor-selected').forEach(e => e.classList.remove('__editor-selected'));
+  }
+  selectedElement = null;
+  $('panelEmpty').style.display = 'block';
+  $('panelContent').style.display = 'none';
+}
+
+function updatePanel() {
+  const el = selectedElement;
+  if (!el) return;
+
+  const cs = el.ownerDocument.defaultView.getComputedStyle(el);
+
+  $('propTag').value = el.tagName.toLowerCase();
+  $('propId').value = el.id || '';
+  $('propClass').value = el.className.replace(/__editor-\w+/g, '').trim();
+
+  // 文字:只取直接文本子节点
+  const directText = Array.from(el.childNodes)
+    .filter(n => n.nodeType === Node.TEXT_NODE)
+    .map(n => n.textContent)
+    .join('');
+  $('propText').value = el.children.length === 0 ? el.textContent : directText;
+
+  $('propFontSize').value = parseInt(cs.fontSize) || '';
+  $('propLineHeight').value = cs.lineHeight === 'normal' ? '' : cs.lineHeight;
+  $('propFontWeight').value = fontWeightToValue(cs.fontWeight);
+  $('propTextAlign').value = cs.textAlign || '';
+
+  $('propColor').value = rgbToHex(cs.color);
+  $('propColorText').value = rgbToHex(cs.color);
+  $('propBgColor').value = cs.backgroundColor === 'rgba(0, 0, 0, 0)' ? '#ffffff' : rgbToHex(cs.backgroundColor);
+  $('propBgColorText').value = cs.backgroundColor === 'rgba(0, 0, 0, 0)' ? 'transparent' : rgbToHex(cs.backgroundColor);
+
+  $('propMarginTop').value = parseInt(cs.marginTop) || 0;
+  $('propMarginRight').value = parseInt(cs.marginRight) || 0;
+  $('propMarginBottom').value = parseInt(cs.marginBottom) || 0;
+  $('propMarginLeft').value = parseInt(cs.marginLeft) || 0;
+
+  $('propPaddingTop').value = parseInt(cs.paddingTop) || 0;
+  $('propPaddingRight').value = parseInt(cs.paddingRight) || 0;
+  $('propPaddingBottom').value = parseInt(cs.paddingBottom) || 0;
+  $('propPaddingLeft').value = parseInt(cs.paddingLeft) || 0;
+
+  $('propWidth').value = el.style.width || cs.width;
+  $('propHeight').value = el.style.height || cs.height;
+
+  $('propBorderRadius').value = cs.borderRadius;
+  $('propBorder').value = cs.border === 'none' ? '' : cs.border;
+
+  $('propDisplay').value = cs.display;
+  $('propOpacity').value = parseFloat(cs.opacity);
+}
+
+// ===================================================================
+//  面板属性变更 → 实时应用
+// ===================================================================
+function bindPanelEvents() {
+  // 文字内容
+  $('propText').addEventListener('input', () => {
+    if (!selectedElement) return;
+    pushUndo();
+    if (selectedElement.children.length === 0) {
+      selectedElement.textContent = $('propText').value;
+    } else {
+      // 只修改第一个文本节点
+      const tn = Array.from(selectedElement.childNodes).find(n => n.nodeType === Node.TEXT_NODE);
+      if (tn) tn.textContent = $('propText').value;
+    }
+    markDirty();
+  });
+
+  // 字号
+  $('propFontSize').addEventListener('input', () => applyStyle('fontSize', $('propFontSize').value + 'px'));
+  $('propLineHeight').addEventListener('input', () => applyStyle('lineHeight', $('propLineHeight').value));
+  $('propFontWeight').addEventListener('change', () => applyStyle('fontWeight', $('propFontWeight').value));
+  $('propTextAlign').addEventListener('change', () => applyStyle('textAlign', $('propTextAlign').value));
+
+  // 颜色
+  $('propColor').addEventListener('input', () => {
+    $('propColorText').value = $('propColor').value;
+    applyStyle('color', $('propColor').value);
+  });
+  $('propColorText').addEventListener('change', () => {
+    $('propColor').value = $('propColorText').value;
+    applyStyle('color', $('propColorText').value);
+  });
+  $('propBgColor').addEventListener('input', () => {
+    $('propBgColorText').value = $('propBgColor').value;
+    applyStyle('backgroundColor', $('propBgColor').value);
+  });
+  $('propBgColorText').addEventListener('change', () => {
+    applyStyle('backgroundColor', $('propBgColorText').value);
+  });
+
+  // 间距
+  ['marginTop','marginRight','marginBottom','marginLeft','paddingTop','paddingRight','paddingBottom','paddingLeft'].forEach(prop => {
+    const id = 'prop' + prop.charAt(0).toUpperCase() + prop.slice(1);
+    $(id).addEventListener('input', () => applyStyle(prop, $(id).value + 'px'));
+  });
+
+  // 尺寸
+  $('propWidth').addEventListener('change', () => applyStyle('width', normalizeSizeValue($('propWidth').value)));
+  $('propHeight').addEventListener('change', () => applyStyle('height', normalizeSizeValue($('propHeight').value)));
+
+  // 边框
+  $('propBorderRadius').addEventListener('change', () => applyStyle('borderRadius', $('propBorderRadius').value));
+  $('propBorder').addEventListener('change', () => applyStyle('border', $('propBorder').value));
+
+  // 显示
+  $('propDisplay').addEventListener('change', () => applyStyle('display', $('propDisplay').value));
+  $('propOpacity').addEventListener('input', () => applyStyle('opacity', $('propOpacity').value));
+}
+
+function applyStyle(prop, value) {
+  if (!selectedElement) return;
+  pushUndo();
+  selectedElement.style[prop] = value;
+  markDirty();
+}
+
+function normalizeSizeValue(v) {
+  if (!v || v === 'auto') return 'auto';
+  if (/^\d+$/.test(v)) return v + 'px';
+  return v;
+}
+
+// ===================================================================
+//  行内编辑
+// ===================================================================
+function startInlineEdit(el) {
+  pushUndo();
+  el.contentEditable = 'true';
+  el.focus();
+  el.style.outline = '2px solid #6c5ce7';
+
+  const done = () => {
+    el.contentEditable = 'false';
+    markDirty();
+    updatePanel();
+  };
+
+  el.addEventListener('blur', done, { once: true });
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' || e.key === 'Enter') {
+      e.preventDefault();
+      el.blur();
+    }
+  });
+}
+
+// ===================================================================
+//  撤销 / 重做
+// ===================================================================
+function getIframeHTML() {
+  const doc = $('previewFrame').contentDocument;
+  if (!doc) return '';
+  // 去除编辑器注入的样式和类
+  const clone = doc.documentElement.cloneNode(true);
+  const editorStyle = clone.querySelector('#__editor_style__');
+  if (editorStyle) editorStyle.remove();
+  clone.querySelectorAll('.__editor-selected').forEach(e => e.classList.remove('__editor-selected'));
+  clone.querySelectorAll('.__editor-hover').forEach(e => e.classList.remove('__editor-hover'));
+  // 去掉注入的 base 标签
+  const base = clone.querySelector('base');
+  if (base) base.remove();
+  return '<!DOCTYPE html>\n' + clone.outerHTML;
+}
+
+function pushUndo() {
+  const html = getIframeHTML();
+  undoStack.push(html);
+  redoStack = [];
+  if (undoStack.length > 50) undoStack.shift();
+  updateUndoRedoButtons();
+}
+
+function doUndo() {
+  if (!undoStack.length) return;
+  redoStack.push(getIframeHTML());
+  const html = undoStack.pop();
+  restoreHTML(html);
+  updateUndoRedoButtons();
+}
+
+function doRedo() {
+  if (!redoStack.length) return;
+  undoStack.push(getIframeHTML());
+  const html = redoStack.pop();
+  restoreHTML(html);
+  updateUndoRedoButtons();
+}
+
+function restoreHTML(html) {
+  const doc = $('previewFrame').contentDocument;
+  if (!doc) return;
+  doc.open();
+  doc.write(html);
+  doc.close();
+  clearSelection();
+  setupIframeInteraction();
+  markDirty();
+}
+
+function updateUndoRedoButtons() {
+  $('btnUndo').disabled = undoStack.length === 0;
+  $('btnRedo').disabled = redoStack.length === 0;
+}
+
+// ===================================================================
+//  保存
+// ===================================================================
+async function doSave() {
+  if (!currentFilePath) { showToast('没有打开的文件', 'error'); return; }
+
+  const html = getIframeHTML();
+
+  try {
+    const res = await fetch('/api/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filePath: currentFilePath, content: html })
+    });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error, 'error'); return; }
+
+    isDirty = false;
+    showToast('✅ 保存成功！', 'success');
+  } catch (e) {
+    showToast('保存失败: ' + e.message, 'error');
+  }
+}
+
+function markDirty() {
+  isDirty = true;
+}
+
+// ===================================================================
+//  设备预览切换
+// ===================================================================
+function setDevice(btn, w, h) {
+  document.querySelectorAll('.device-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const frame = $('canvasFrame');
+  if (w === '100%') {
+    frame.style.width = '100%';
+    frame.style.height = '100%';
+    frame.style.borderRadius = '0';
+  } else {
+    frame.style.width = w + 'px';
+    frame.style.height = h + 'px';
+    frame.style.borderRadius = '8px';
+  }
+}
+
+// ===================================================================
+//  删除元素
+// ===================================================================
+function deleteSelected() {
+  if (!selectedElement) return;
+  if (!confirm('确定删除这个元素吗？')) return;
+  pushUndo();
+  selectedElement.remove();
+  clearSelection();
+  markDirty();
+  showToast('已删除元素', 'info');
+}
+
+// ===================================================================
+//  颜色工具函数
+// ===================================================================
+function rgbToHex(rgb) {
+  if (!rgb || rgb === 'transparent' || rgb === 'rgba(0, 0, 0, 0)') return '#ffffff';
+  const m = rgb.match(/\d+/g);
+  if (!m || m.length < 3) return '#000000';
+  return '#' + m.slice(0, 3).map(x => parseInt(x).toString(16).padStart(2, '0')).join('');
+}
+
+function fontWeightToValue(fw) {
+  const n = parseInt(fw);
+  if (n <= 400) return 'normal';
+  if (n <= 500) return '500';
+  if (n <= 600) return '600';
+  return 'bold';
+}
+
+// ===================================================================
+//  快捷键
+// ===================================================================
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.key === 's') { e.preventDefault(); doSave(); }
+  if (e.ctrlKey && e.key === 'z') { e.preventDefault(); doUndo(); }
+  if (e.ctrlKey && e.key === 'y') { e.preventDefault(); doRedo(); }
+  if (e.key === 'Delete' && selectedElement) { deleteSelected(); }
+  if (e.key === 'Escape') { clearSelection(); }
+});
+
+// ===================================================================
+//  初始化
+// ===================================================================
+bindPanelEvents();
+</script>
+</body>
+</html>
