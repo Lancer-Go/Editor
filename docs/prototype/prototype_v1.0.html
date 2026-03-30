@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>编辑器原型 v1.0</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+/* カスタムスクロールバー */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #4B5563; }
+
+/* Canvas Background */
+.canvas-bg {
+  background-color: #f3f4f6;
+  background-image: radial-gradient(#d1d5db 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Alignment Guides */
+.guide-line {
+  position: absolute;
+  background-color: #ef4444;
+  z-index: 50;
+  display: none;
+}
+.guide-v { width: 1px; height: 100%; top: 0; }
+.guide-h { height: 1px; width: 100%; left: 0; }
+
+/* Sandbox overlays */
+.sandbox-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+
+body.focus-mode .sandbox-overlay:not(.focused) {
+  opacity: 1;
+  pointer-events: auto;
+}
+</style>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          brand: {
+            50: '#f0eeff',
+            100: '#e3dfff',
+            500: '#6c5ce7',
+            600: '#5a4bd6',
+          },
+          editor: {
+            bg: '#0f1117',
+            panel: '#1a1d27',
+            border: '#2e3348',
+            hover: '#2d3245',
+          }
+        }
+      }
+    }
+  }
+</script>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col bg-editor-bg text-gray-300 text-sm select-none">
+
+  <!-- Toolbar -->
+  <header class="h-14 bg-editor-panel border-b border-editor-border flex items-center px-4 shrink-0 justify-between z-20">
+    <div class="flex items-center gap-4">
+      <div class="flex items-center gap-2 pr-4 border-r border-editor-border">
+        <svg class="w-6 h-6 text-brand-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/>
+        </svg>
+        <span class="font-bold text-transparent bg-clip-text bg-gradient-to-r from-brand-500 to-indigo-400 focus-target" id="brand-logo">HTML Editor Pro</span>
+      </div>
+      
+      <!-- History -->
+      <div class="flex items-center gap-1">
+        <button class="p-1.5 rounded hover:bg-editor-hover text-gray-500 disabled:opacity-50" disabled><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10h10a5 5 0 0 1 5 5v2a5 5 0 0 1-5 5H3"/><polyline points="7 6 3 10 7 14"/></svg></button>
+        <button class="p-1.5 rounded hover:bg-editor-hover text-gray-500 disabled:opacity-50" disabled><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10H11a5 5 0 0 0-5 5v2a5 5 0 0 0 5 5h10"/><polyline points="17 6 21 10 17 14"/></svg></button>
+      </div>
+      <div class="w-px h-6 bg-editor-border mx-2"></div>
+      
+      <!-- Device Switch -->
+      <div class="flex items-center bg-[#13151c] rounded-md p-1 border border-editor-border">
+        <button class="px-3 py-1 bg-editor-hover text-white rounded shadow-sm text-xs focus-target" id="device-desktop">💻 桌面</button>
+        <button class="px-3 py-1 hover:text-white rounded text-xs">📱 平板</button>
+        <button class="px-3 py-1 hover:text-white rounded text-xs">📲 手机</button>
+      </div>
+    </div>
+
+    <!-- Center: File path -->
+    <div class="flex-1 flex justify-center">
+      <div class="flex items-center gap-2 bg-[#13151c] px-3 py-1.5 rounded-md border border-editor-border max-w-md w-full focus-target" id="url-bar">
+        <svg class="w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+        <span class="text-xs text-gray-400 truncate">demo-project / index.html <span class="text-yellow-500 ml-1">*未保存</span></span>
+      </div>
+    </div>
+
+    <!-- Right Actions -->
+    <div class="flex items-center gap-2">
+      <button class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-editor-hover hover:bg-[#343a4e] text-xs transition-colors focus-target" id="btn-export">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        导出 (P4)
+      </button>
+      <button class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-editor-hover hover:bg-[#343a4e] text-xs transition-colors focus-target" id="btn-code">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        源码 (P5)
+      </button>
+      <div class="w-px h-6 bg-editor-border mx-1"></div>
+      <button class="flex items-center gap-1.5 px-4 py-1.5 rounded bg-brand-500 hover:bg-brand-600 text-white text-xs font-medium shadow-[0_0_10px_rgba(108,92,231,0.3)] transition-all">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        保存
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <div class="flex flex-1 overflow-hidden relative">
+    
+    <!-- Left Sidebar (Multi-tab) -->
+    <aside class="w-[280px] bg-editor-panel border-r border-editor-border flex flex-col shrink-0 z-10 focus-target" id="left-sidebar">
+      <!-- Tabs -->
+      <div class="flex border-b border-editor-border text-xs focus-target" id="sidebar-tabs">
+        <button class="flex-1 py-3 text-brand-500 border-b-2 border-brand-500 font-medium bg-[#13151c]" onclick="switchTab('components')">📦 组件(P1)</button>
+        <button class="flex-1 py-3 text-gray-400 hover:text-gray-200 border-b-2 border-transparent" onclick="switchTab('files')">📂 项目(P1)</button>
+      </div>
+
+      <!-- Tab Content: Components -->
+      <div id="tab-components" class="flex-1 overflow-y-auto p-3">
+        <!-- Search -->
+        <div class="relative mb-4">
+          <svg class="w-4 h-4 absolute left-3 top-2.5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" placeholder="搜索组件..." class="w-full bg-[#13151c] border border-editor-border rounded-md py-2 pl-9 pr-3 text-xs outline-none focus:border-brand-500 transition-colors">
+        </div>
+
+        <!-- Accordion Group 1 -->
+        <div class="mb-2">
+          <button class="flex items-center justify-between w-full text-left text-xs font-semibold text-gray-400 py-2 hover:text-gray-200">
+            <span>基础元素</span>
+            <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="grid grid-cols-2 gap-2 mt-1">
+            <div class="border border-editor-border bg-[#13151c] rounded p-3 flex flex-col items-center justify-center gap-2 cursor-grab hover:border-brand-500 hover:text-brand-500 transition-colors group draggable-component" draggable="true">
+              <svg class="w-6 h-6 text-gray-500 group-hover:text-brand-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+              <span class="text-[11px]">文字段落</span>
+            </div>
+            <div class="border border-editor-border bg-[#13151c] rounded p-3 flex flex-col items-center justify-center gap-2 cursor-grab hover:border-brand-500 hover:text-brand-500 transition-colors group draggable-component" draggable="true">
+              <svg class="w-6 h-6 text-gray-500 group-hover:text-brand-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              <span class="text-[11px]">图片占位</span>
+            </div>
+            <div class="border border-editor-border bg-[#13151c] rounded p-3 flex flex-col items-center justify-center gap-2 cursor-grab hover:border-brand-500 hover:text-brand-500 transition-colors group draggable-component" draggable="true">
+              <svg class="w-6 h-6 text-gray-500 group-hover:text-brand-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <span class="text-[11px]">分割线</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Accordion Group 2 -->
+        <div class="mb-2">
+          <button class="flex items-center justify-between w-full text-left text-xs font-semibold text-gray-400 py-2 hover:text-gray-200">
+            <span>按钮类</span>
+            <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="flex flex-col gap-2 mt-1">
+            <div class="border border-editor-border bg-[#13151c] rounded p-2 flex items-center gap-3 cursor-grab hover:border-brand-500 group draggable-component" draggable="true">
+              <div class="w-16 h-6 bg-brand-500 rounded text-[10px] text-white flex items-center justify-center">按钮</div>
+              <span class="text-[11px] group-hover:text-brand-500 w-full">主按钮</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Accordion Group 3 -->
+        <div class="mb-2">
+          <button class="flex items-center justify-between w-full text-left text-xs font-semibold text-gray-400 py-2 hover:text-gray-200">
+            <span>表单控件</span>
+            <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="flex flex-col gap-2 mt-1">
+            <div class="border border-editor-border bg-[#13151c] rounded p-2 flex items-center gap-3 cursor-grab hover:border-brand-500 group draggable-component" draggable="true">
+              <div class="w-16 h-6 bg-white border border-gray-300 rounded"></div>
+              <span class="text-[11px] group-hover:text-brand-500 w-full">单行输入框</span>
+            </div>
+            <div class="border border-editor-border bg-[#13151c] rounded p-2 flex items-center gap-3 cursor-grab hover:border-brand-500 group draggable-component" draggable="true">
+              <div class="w-16 h-6 flex items-center bg-white border border-gray-300 rounded px-1"><svg class="w-3 h-3 text-gray-400 ml-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
+              <span class="text-[11px] group-hover:text-brand-500 w-full">下拉选择</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Content: Files (Hidden by default) -->
+      <div id="tab-files" class="flex-1 overflow-y-auto hidden flex-col">
+        <div class="p-3 border-b border-editor-border text-xs text-brand-500 bg-[#13151c] flex items-center justify-between focus-target" id="project-header">
+          <div class="flex items-center gap-2">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            <span class="font-bold">demo-project</span>
+          </div>
+          <button class="text-gray-400 hover:text-white" title="新建页面"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+        </div>
+        
+        <div class="px-2 py-3 space-y-0.5">
+          <div class="flex items-center gap-2 px-2 py-1.5 rounded bg-[#2a2d3d] text-brand-500 cursor-pointer text-xs">
+            <svg class="w-4 h-4 text-brand-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            <span class="truncate">index.html</span>
+          </div>
+          <div class="flex items-center justify-between px-2 py-1.5 rounded hover:bg-editor-hover text-gray-400 cursor-pointer text-xs group">
+            <div class="flex items-center gap-2 truncate">
+              <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+              <span>settings.html</span>
+            </div>
+            <button class="hidden group-hover:block text-gray-500 hover:text-brand-500"><svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Center Canvas -->
+    <main class="flex-1 flex flex-col relative overflow-hidden">
+      <!-- Top rulers (mock) -->
+      <div class="h-6 bg-[#13151c] border-b border-editor-border flex items-end px-[50px] overflow-hidden">
+        <div class="w-full h-2 flex gap-[50px] text-[9px] text-gray-600 font-mono">
+          <span>0</span><span>100</span><span>200</span><span>300</span><span>400</span><span>500</span><span>600</span><span>700</span><span>800</span><span>900</span><span>1000</span>
+        </div>
+      </div>
+
+      <!-- Canvas Area -->
+      <div class="flex-1 canvas-bg overflow-auto relative flex items-center justify-center p-8 focus-target" id="canvas-area">
+        
+        <!-- Smart Alignment Guides -->
+        <div class="guide-line guide-v" style="left: calc(50% - 150px);"></div>
+        <div class="guide-line guide-h" style="top: calc(50% - 20px);"></div>
+
+        <!-- The Prototype Preview Document -->
+        <div class="bg-white w-[1000px] h-[700px] shadow-2xl relative overflow-hidden" id="prototype-container">
+          <!-- Mock Content inside prototype -->
+          <div class="p-8 font-sans text-gray-800">
+            <h1 class="text-3xl font-bold mb-6 hover:outline hover:outline-1 hover:outline-dashed hover:outline-blue-400 cursor-pointer">CRM 仪表盘原型</h1>
+            
+            <div class="grid grid-cols-3 gap-6 mb-8">
+              <div class="p-6 bg-white border rounded-xl shadow-sm hover:outline hover:outline-1 hover:outline-dashed hover:outline-blue-400 cursor-pointer relative" id="demo-card">
+                <!-- Selection Box -->
+                <div class="absolute inset-0 border-2 border-brand-500 pointer-events-none"></div>
+                <div class="absolute -top-2 -right-2 bg-brand-500 text-white text-[10px] px-1.5 rounded">卡片</div>
+                
+                <h3 class="text-sm text-gray-500 font-medium">总销售额</h3>
+                <p class="text-3xl font-bold mt-2">¥124,500</p>
+                <div class="mt-4 text-xs text-green-500 flex items-center gap-1">
+                  <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                  较上月增长 12.5%
+                </div>
+              </div>
+              
+              <div class="p-6 bg-white border rounded-xl shadow-sm hover:outline hover:outline-1 hover:outline-dashed hover:outline-blue-400 cursor-pointer">
+                <h3 class="text-sm text-gray-500 font-medium">新增客户</h3>
+                <p class="text-3xl font-bold mt-2">1,245</p>
+              </div>
+            </div>
+
+            <button class="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium shadow-md shadow-blue-500/30 hover:outline hover:outline-1 hover:outline-dashed hover:outline-blue-400 cursor-pointer focus-target" id="demo-btn">
+              + 添加新客户
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- Right Properties Panel -->
+    <aside class="w-[280px] bg-editor-panel border-l border-editor-border flex flex-col shrink-0 overflow-y-auto focus-target" id="right-panel">
+      <!-- Element Path -->
+      <div class="px-4 py-3 border-b border-editor-border bg-[#13151c]">
+        <div class="flex items-center gap-1.5 text-xs text-gray-400 mb-1">
+          <span class="hover:text-white cursor-pointer truncate max-w-[80px]">div.grid</span>
+          <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+          <span class="text-brand-500 font-medium truncate">div.card</span>
+        </div>
+        <div class="text-[10px] text-gray-500">ID: demo-card</div>
+      </div>
+
+      <!-- Properties Layout -->
+      <div class="p-4 space-y-6">
+        
+        <!-- Text Content -->
+        <div>
+          <h3 class="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-3">文字内容</h3>
+          <textarea class="w-full bg-[#13151c] border border-editor-border rounded px-3 py-2 text-xs focus:border-brand-500 outline-none resize-none h-16 text-gray-300">文本不在这层...</textarea>
+        </div>
+
+        <!-- Layout & Alignment -->
+        <div>
+          <h3 class="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-3">布局与对齐</h3>
+          
+          <div class="grid grid-cols-2 gap-2 mb-3">
+            <div class="flex flex-col">
+              <span class="text-[10px] text-gray-500 mb-1">X 坐标</span>
+              <div class="relative">
+                <input type="text" value="32px" class="w-full bg-[#13151c] border border-editor-border rounded px-2 py-1.5 text-xs focus:border-brand-500 outline-none">
+              </div>
+            </div>
+            <div class="flex flex-col">
+              <span class="text-[10px] text-gray-500 mb-1">Y 坐标</span>
+              <div class="relative">
+                <input type="text" value="124px" class="w-full bg-[#13151c] border border-editor-border rounded px-2 py-1.5 text-xs focus:border-brand-500 outline-none">
+              </div>
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-2">
+            <div class="flex flex-col">
+              <span class="text-[10px] text-gray-500 mb-1">宽度 (W)</span>
+              <div class="relative">
+                <input type="text" value="280px" class="w-full bg-[#13151c] border border-editor-border rounded px-2 py-1.5 text-xs focus:border-brand-500 outline-none">
+              </div>
+            </div>
+            <div class="flex flex-col">
+              <span class="text-[10px] text-gray-500 mb-1">高度 (H)</span>
+              <div class="relative">
+                <input type="text" value="142px" class="w-full bg-[#13151c] border border-editor-border rounded px-2 py-1.5 text-xs focus:border-brand-500 outline-none">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Appearance -->
+        <div class="focus-target" id="appearance-panel">
+          <h3 class="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-3">外观</h3>
+          
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs text-gray-400">填充 (Fill)</span>
+            <div class="flex items-center gap-2">
+              <div class="w-5 h-5 rounded border border-gray-600 bg-white shadow-inner cursor-pointer"></div>
+              <input type="text" value="#FFFFFF" class="w-20 bg-[#13151c] border border-editor-border rounded px-2 py-1 text-xs focus:border-brand-500 outline-none">
+            </div>
+          </div>
+          
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs text-gray-400">描边 (Border)</span>
+            <div class="flex items-center gap-2">
+              <div class="w-5 h-5 rounded border-2 border-gray-200 bg-transparent cursor-pointer"></div>
+              <input type="text" value="#E5E7EB" class="w-20 bg-[#13151c] border border-editor-border rounded px-2 py-1 text-xs focus:border-brand-500 outline-none">
+            </div>
+          </div>
+          
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-gray-400">圆角 (Radius)</span>
+            <div class="relative">
+              <input type="text" value="12px" class="w-20 bg-[#13151c] border border-editor-border rounded px-2 py-1 text-xs focus:border-brand-500 outline-none text-right">
+            </div>
+          </div>
+        </div>
+        
+        <!-- Page Link -->
+        <div class="pt-4 border-t border-editor-border focus-target" id="link-panel">
+          <h3 class="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5 text-brand-500">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            页面跳转 (P1)
+          </h3>
+          <div class="relative w-full">
+            <select class="w-full bg-[#13151c] border border-brand-500/50 rounded px-2 py-2 text-xs text-white outline-none appearance-none cursor-pointer">
+              <option value="">-- 不设置跳转 --</option>
+              <option value="index.html">index.html (当前页)</option>
+              <option value="settings.html" selected>settings.html</option>
+            </select>
+            <svg class="w-4 h-4 text-gray-400 absolute right-2 top-2 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+        </div>
+
+        <!-- Export -->
+        <div class="pt-4 mt-auto">
+          <button class="w-full py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded text-xs font-medium hover:bg-red-500/20 transition-colors flex items-center justify-center gap-1.5">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            删除选中区域
+          </button>
+        </div>
+
+      </div>
+    </aside>
+  </div>
+
+<script>
+  function switchTab(tabId) {
+    document.getElementById('tab-components').classList.add('hidden');
+    document.getElementById('tab-files').classList.remove('flex');
+    document.getElementById('tab-files').classList.add('hidden');
+    
+    document.getElementById('sidebar-tabs').children[0].className = 'flex-1 py-3 text-gray-400 hover:text-gray-200 border-b-2 border-transparent';
+    document.getElementById('sidebar-tabs').children[1].className = 'flex-1 py-3 text-gray-400 hover:text-gray-200 border-b-2 border-transparent';
+    
+    if (tabId === 'components') {
+      document.getElementById('tab-components').classList.remove('hidden');
+      document.getElementById('sidebar-tabs').children[0].className = 'flex-1 py-3 text-brand-500 border-b-2 border-brand-500 font-medium bg-[#13151c]';
+    } else {
+      document.getElementById('tab-files').classList.remove('hidden');
+      document.getElementById('tab-files').classList.add('flex');
+      document.getElementById('sidebar-tabs').children[1].className = 'flex-1 py-3 text-brand-500 border-b-2 border-brand-500 font-medium bg-[#13151c]';
+    }
+  }
+
+  // Handle URL Sandbox Focus Parameter
+  window.onload = function() {
+    const params = new URLSearchParams(window.location.search);
+    const focusTarget = params.get('focus');
+    
+    if (focusTarget) {
+      document.body.classList.add('focus-mode');
+      
+      // Inject overlays on interactive parts
+      document.querySelectorAll('.focus-target').forEach(el => {
+        if (el.id !== focusTarget) {
+          const overlay = document.createElement('div');
+          overlay.className = 'sandbox-overlay backdrop-blur-[1px]';
+          // Make sure parent is relative
+          const parentStyle = window.getComputedStyle(el);
+          if(parentStyle.position === 'static') el.style.position = 'relative';
+          el.appendChild(overlay);
+        } else {
+          // Highlight target
+          el.classList.add('ring-2', 'ring-brand-500', 'ring-offset-2', 'ring-offset-editor-bg', 'z-50', 'relative');
+        }
+      });
+    }
+  }
+</script>
+</body>
+</html>

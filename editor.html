@@ -153,6 +153,33 @@ body {
 
 .sidebar.collapsed { width: 0; overflow: hidden; border: none; }
 
+.sidebar-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.sidebar-tab {
+  flex: 1;
+  padding: 10px 0;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all var(--transition);
+}
+
+.sidebar-tab:hover { color: var(--text-primary); }
+.sidebar-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(108,92,231,0.05); }
+
+.sidebar-panel { flex: 1; overflow-y: auto; display: none; flex-direction: column; }
+.sidebar-panel.active { display: flex; }
+
 .sidebar-header {
   padding: 12px 16px;
   border-bottom: 1px solid var(--border-color);
@@ -168,6 +195,82 @@ body {
   letter-spacing: 0.5px;
   color: var(--text-muted);
 }
+
+/* Component Panel */
+.comp-search {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.comp-search input {
+  width: 100%;
+  height: 30px;
+  padding: 0 10px 0 30px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+}
+
+.comp-search input:focus { border-color: var(--accent); }
+
+.comp-group-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  border: none;
+  background: transparent;
+  width: 100%;
+  font-family: inherit;
+  transition: color var(--transition);
+}
+
+.comp-group-title:hover { color: var(--text-primary); }
+.comp-group-title .arrow { transition: transform 0.2s; }
+.comp-group-title.collapsed .arrow { transform: rotate(-90deg); }
+
+.comp-group-items {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px 12px 10px;
+}
+
+.comp-group-items.collapsed { display: none; }
+
+.comp-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 4px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  cursor: grab;
+  font-size: 11px;
+  color: var(--text-secondary);
+  transition: all var(--transition);
+  text-align: center;
+}
+
+.comp-item:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(108,92,231,0.08);
+}
+
+.comp-item:active { cursor: grabbing; transform: scale(0.95); }
+.comp-item .comp-icon { font-size: 18px; }
 
 .dir-input-wrap {
   padding: 8px 12px;
@@ -460,6 +563,26 @@ body {
 
 @keyframes slideIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+/* Drop overlay for cross-iframe drag */
+.drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: none;
+  cursor: copy;
+}
+
+.drop-overlay.active {
+  display: block;
+  background: rgba(108, 92, 231, 0.08);
+  border: 2px dashed var(--accent);
+  border-radius: 4px;
+}
+
+.drop-overlay.drag-over {
+  background: rgba(108, 92, 231, 0.15);
+}
 </style>
 </head>
 <body>
@@ -518,21 +641,42 @@ body {
   <!-- ===== 主体 ===== -->
   <div class="main-body">
 
-    <!-- 左侧文件面板 -->
+    <!-- 左侧面板 (双 Tab) -->
     <div class="sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <h3>📂 文件浏览</h3>
+      <!-- Tab 切换 -->
+      <div class="sidebar-tabs">
+        <button class="sidebar-tab active" onclick="switchSidebarTab('files')">📂 文件</button>
+        <button class="sidebar-tab" onclick="switchSidebarTab('components')">📦 组件</button>
       </div>
-      <div class="dir-input-wrap">
-        <div class="dir-input-row">
-          <input type="text" class="dir-input" id="dirInput" placeholder="输入目录路径，如 C:\projects" />
-          <button class="dir-btn" onclick="loadDirectory()">打开</button>
+
+      <!-- Tab: 文件 -->
+      <div class="sidebar-panel active" id="panelFiles">
+        <div class="dir-input-wrap">
+          <div class="dir-input-row">
+            <input type="text" class="dir-input" id="dirInput" placeholder="输入目录路径，如 C:\projects" />
+            <button class="dir-btn" onclick="loadDirectory()">打开</button>
+          </div>
+        </div>
+        <div id="recentFilesWrap" style="display:none; border-bottom:1px solid var(--border-color);">
+          <div style="padding:8px 16px 4px; font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; justify-content:space-between;">
+            <span>🕐 最近打开</span>
+            <button onclick="clearRecentFiles()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:10px;font-family:inherit;" title="清除">✕</button>
+          </div>
+          <div id="recentFilesList" style="padding:2px 0 6px;"></div>
+        </div>
+        <div class="file-tree" id="fileTree">
+          <div class="file-tree-empty">
+            输入目录路径并点击"打开"<br>开始浏览 HTML 文件
+          </div>
         </div>
       </div>
-      <div class="file-tree" id="fileTree">
-        <div class="file-tree-empty">
-          输入目录路径并点击"打开"<br>开始浏览 HTML 文件
+
+      <!-- Tab: 组件 -->
+      <div class="sidebar-panel" id="panelComponents">
+        <div class="comp-search">
+          <input type="text" id="compSearchInput" placeholder="🔍 搜索组件..." oninput="filterComponents()" />
         </div>
+        <div class="file-tree" id="compTree" style="padding:4px 0;"></div>
       </div>
     </div>
 
@@ -546,8 +690,9 @@ body {
           <p>从左侧选择一个 HTML 文件开始编辑</p>
           <span class="hint">支持点选元素、修改文字、调整样式</span>
         </div>
-        <div class="canvas-frame" id="canvasFrame" style="display:none; width:1200px; height:800px;">
+        <div class="canvas-frame" id="canvasFrame" style="display:none; width:1200px; height:800px; position:relative;">
           <iframe id="previewFrame" sandbox="allow-same-origin allow-scripts"></iframe>
+          <div class="drop-overlay" id="dropOverlay"></div>
         </div>
       </div>
       <div class="device-bar">
@@ -704,6 +849,17 @@ body {
           </div>
         </div>
 
+        <!-- 页面跳转配置 -->
+        <div class="panel-section" id="linkSection" style="display:none;">
+          <div class="panel-title">🔗 页面跳转</div>
+          <div class="panel-row">
+            <span class="panel-label">链接到</span>
+            <select class="panel-select" id="propPageLink" onchange="setPageLink(this.value)">
+              <option value="">-- 不设置 --</option>
+            </select>
+          </div>
+        </div>
+
         <!-- 操作按钮 -->
         <div class="panel-section" style="border-bottom:none;">
           <button class="tb-btn" onclick="deleteSelected()" style="width:100%;justify-content:center;color:var(--danger);border:1px solid var(--danger);border-radius:6px;">
@@ -729,6 +885,7 @@ let currentDir = null;            // 当前浏览的目录
 let undoStack = [];               // 撤销栈
 let redoStack = [];               // 重做栈
 let isDirty = false;              // 是否有未保存的修改
+let recentFiles = JSON.parse(localStorage.getItem('recentFiles') || '[]'); // 最近文件
 
 // ===================================================================
 //  工具函数
@@ -769,6 +926,8 @@ async function loadDirectory(dir) {
 
     currentDir = data.dir;
     $('dirInput').value = data.dir;
+    // 记忆目录到 localStorage
+    localStorage.setItem('lastDir', data.dir);
     renderFileTree(data.items, data.dir);
   } catch (e) {
     showToast('连接服务器失败', 'error');
@@ -777,12 +936,8 @@ async function loadDirectory(dir) {
 
 function renderFileTree(items, parentDir) {
   const tree = $('fileTree');
-  if (!items.length) {
-    tree.innerHTML = '<div class="file-tree-empty">此目录下没有 HTML 文件</div>';
-    return;
-  }
 
-  // 添加返回上级
+  // 始终显示返回上级按钮（修复空文件夹 Bug）
   let html = '';
   const parent = parentDir.replace(/\\/g, '/');
   const parentParts = parent.split('/');
@@ -791,6 +946,12 @@ function renderFileTree(items, parentDir) {
     html += `<div class="file-item" onclick="loadDirectory('${upDir.replace(/'/g, "\\'")}')">
       <span class="icon">⬆️</span><span class="name">.. 返回上级</span>
     </div>`;
+  }
+
+  if (!items.length) {
+    html += '<div class="file-tree-empty">此目录下没有 HTML 文件</div>';
+    tree.innerHTML = html;
+    return;
   }
 
   for (const item of items) {
@@ -840,6 +1001,8 @@ async function openFile(filePath) {
 
     // 加载到 iframe
     loadPreview(data.path);
+    // 记录到最近文件
+    addRecentFile(data.path, fileName);
     showToast('已打开: ' + fileName, 'success');
 
   } catch (e) {
@@ -883,6 +1046,33 @@ function setupIframeInteraction() {
       outline: 1px dashed rgba(108,92,231,0.5) !important;
       outline-offset: 1px;
     }
+    .__editor-handle {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      background: #6c5ce7;
+      border: 1px solid #fff;
+      border-radius: 2px;
+      z-index: 99999;
+      box-shadow: 0 0 3px rgba(0,0,0,0.3);
+    }
+    .__editor-handle-tl { cursor: nw-resize; }
+    .__editor-handle-tr { cursor: ne-resize; }
+    .__editor-handle-bl { cursor: sw-resize; }
+    .__editor-handle-br { cursor: se-resize; }
+    .__editor-handle-t  { cursor: n-resize; }
+    .__editor-handle-b  { cursor: s-resize; }
+    .__editor-handle-l  { cursor: w-resize; }
+    .__editor-handle-r  { cursor: e-resize; }
+    .__editor-guide {
+      position: fixed;
+      background: #ef4444;
+      z-index: 99998;
+      display: none;
+      pointer-events: none;
+    }
+    .__editor-guide-v { width: 1px; top: 0; bottom: 0; }
+    .__editor-guide-h { height: 1px; left: 0; right: 0; }
   `;
   doc.head.appendChild(style);
 
@@ -923,10 +1113,82 @@ function setupIframeInteraction() {
     startInlineEdit(el);
   }, true);
 
-  // 拖拽逻辑
+  // 拖拽逻辑（含智能对齐辅助线）
   let dragEl = null, dragStartX, dragStartY, origLeft, origTop, origPosition;
+  let guideLines = []; // 辅助线 DOM 元素
+
+  // 创建辅助线元素
+  function ensureGuideLines() {
+    if (guideLines.length) return;
+    for (let i = 0; i < 6; i++) {
+      const g = doc.createElement('div');
+      g.className = '__editor-guide ' + (i < 3 ? '__editor-guide-v' : '__editor-guide-h');
+      doc.body.appendChild(g);
+      guideLines.push(g);
+    }
+  }
+
+  function hideGuides() {
+    guideLines.forEach(g => g.style.display = 'none');
+  }
+
+  function checkAlignment(draggedRect) {
+    hideGuides();
+    const THRESHOLD = 5;
+    const siblings = Array.from(doc.body.children).filter(el =>
+      el !== dragEl && !el.className.includes('__editor-') && el.offsetWidth > 0
+    );
+    let gi = 0;
+    let snapX = null, snapY = null;
+    const dCx = draggedRect.left + draggedRect.width / 2;
+    const dCy = draggedRect.top + draggedRect.height / 2;
+
+    for (const sib of siblings) {
+      const r = sib.getBoundingClientRect();
+      const sCx = r.left + r.width / 2;
+      const sCy = r.top + r.height / 2;
+
+      // 垂直线对齐
+      const vChecks = [
+        { d: draggedRect.left, s: r.left },
+        { d: draggedRect.right, s: r.right },
+        { d: dCx, s: sCx },
+      ];
+      for (const vc of vChecks) {
+        if (Math.abs(vc.d - vc.s) <= THRESHOLD && gi < 3) {
+          guideLines[gi].style.left = vc.s + 'px';
+          guideLines[gi].style.display = 'block';
+          snapX = vc.s - (vc.d - draggedRect.left) + origLeft;
+          gi++;
+          break;
+        }
+      }
+      // 水平线对齐
+      const hChecks = [
+        { d: draggedRect.top, s: r.top },
+        { d: draggedRect.bottom, s: r.bottom },
+        { d: dCy, s: sCy },
+      ];
+      for (const hc of hChecks) {
+        if (Math.abs(hc.d - hc.s) <= THRESHOLD && gi < 6) {
+          guideLines[gi].style.top = hc.s + 'px';
+          guideLines[gi].style.display = 'block';
+          snapY = hc.s - (hc.d - draggedRect.top) + origTop;
+          gi++;
+          break;
+        }
+      }
+    }
+    return { snapX, snapY };
+  }
 
   doc.addEventListener('mousedown', (e) => {
+    // 检查是否点击了 resize handle
+    if (e.target.className && e.target.className.includes('__editor-handle')) {
+      startResize(e, doc);
+      return;
+    }
+
     if (!selectedElement || e.target !== selectedElement) return;
     if (selectedElement.isContentEditable) return;
 
@@ -944,19 +1206,30 @@ function setupIframeInteraction() {
 
     origLeft = parseInt(cs.left) || 0;
     origTop = parseInt(cs.top) || 0;
+    ensureGuideLines();
     e.preventDefault();
   }, true);
 
   doc.addEventListener('mousemove', (e) => {
     if (!dragEl) return;
-    const dx = e.clientX - dragStartX;
-    const dy = e.clientY - dragStartY;
-    dragEl.style.left = (origLeft + dx) + 'px';
-    dragEl.style.top = (origTop + dy) + 'px';
+    let dx = e.clientX - dragStartX;
+    let dy = e.clientY - dragStartY;
+    let newLeft = origLeft + dx;
+    let newTop = origTop + dy;
+
+    dragEl.style.left = newLeft + 'px';
+    dragEl.style.top = newTop + 'px';
+
+    // 智能对齐
+    const rect = dragEl.getBoundingClientRect();
+    const snap = checkAlignment(rect);
+    if (snap.snapX !== null) dragEl.style.left = snap.snapX + 'px';
+    if (snap.snapY !== null) dragEl.style.top = snap.snapY + 'px';
   }, true);
 
   doc.addEventListener('mouseup', () => {
     if (dragEl) {
+      hideGuides();
       pushUndo();
       markDirty();
       updatePanel();
@@ -972,8 +1245,9 @@ function selectElement(el) {
   const doc = $('previewFrame').contentDocument;
   if (!doc) return;
 
-  // 清除之前的选中
+  // 清除之前的选中 + resize handles
   doc.querySelectorAll('.__editor-selected').forEach(e => e.classList.remove('__editor-selected'));
+  removeResizeHandles(doc);
 
   selectedElement = el;
   el.classList.add('__editor-selected');
@@ -983,6 +1257,12 @@ function selectElement(el) {
   $('panelEmpty').style.display = 'none';
   $('panelContent').style.display = 'block';
 
+  // 添加 resize handles
+  addResizeHandles(el, doc);
+
+  // 更新页面跳转配置
+  updateLinkSection(el);
+
   updatePanel();
 }
 
@@ -990,10 +1270,170 @@ function clearSelection() {
   const doc = $('previewFrame').contentDocument;
   if (doc) {
     doc.querySelectorAll('.__editor-selected').forEach(e => e.classList.remove('__editor-selected'));
+    removeResizeHandles(doc);
   }
   selectedElement = null;
   $('panelEmpty').style.display = 'block';
   $('panelContent').style.display = 'none';
+}
+
+// ===================================================================
+//  Resize Handles
+// ===================================================================
+function addResizeHandles(el, doc) {
+  const positions = ['tl','t','tr','r','br','b','bl','l'];
+  const rect = el.getBoundingClientRect();
+  const scrollX = doc.documentElement.scrollLeft || 0;
+  const scrollY = doc.documentElement.scrollTop || 0;
+
+  positions.forEach(pos => {
+    const h = doc.createElement('div');
+    h.className = '__editor-handle __editor-handle-' + pos;
+    h.dataset.handlePos = pos;
+
+    let left, top;
+    switch(pos) {
+      case 'tl': left = rect.left - 4; top = rect.top - 4; break;
+      case 't':  left = rect.left + rect.width/2 - 4; top = rect.top - 4; break;
+      case 'tr': left = rect.right - 4; top = rect.top - 4; break;
+      case 'r':  left = rect.right - 4; top = rect.top + rect.height/2 - 4; break;
+      case 'br': left = rect.right - 4; top = rect.bottom - 4; break;
+      case 'b':  left = rect.left + rect.width/2 - 4; top = rect.bottom - 4; break;
+      case 'bl': left = rect.left - 4; top = rect.bottom - 4; break;
+      case 'l':  left = rect.left - 4; top = rect.top + rect.height/2 - 4; break;
+    }
+    h.style.left = (left + scrollX) + 'px';
+    h.style.top = (top + scrollY) + 'px';
+    doc.body.appendChild(h);
+  });
+}
+
+function removeResizeHandles(doc) {
+  doc.querySelectorAll('.__editor-handle').forEach(h => h.remove());
+}
+
+function repositionHandles() {
+  if (!selectedElement) return;
+  const doc = $('previewFrame').contentDocument;
+  if (!doc) return;
+  removeResizeHandles(doc);
+  addResizeHandles(selectedElement, doc);
+}
+
+// Resize interaction
+let resizeData = null;
+
+function startResize(e, doc) {
+  if (!selectedElement) return;
+  const pos = e.target.dataset.handlePos;
+  const rect = selectedElement.getBoundingClientRect();
+  const cs = doc.defaultView.getComputedStyle(selectedElement);
+
+  resizeData = {
+    pos,
+    startX: e.clientX,
+    startY: e.clientY,
+    origWidth: parseInt(cs.width) || rect.width,
+    origHeight: parseInt(cs.height) || rect.height,
+    el: selectedElement,
+    doc
+  };
+
+  const onMove = (ev) => {
+    if (!resizeData) return;
+    const dx = ev.clientX - resizeData.startX;
+    const dy = ev.clientY - resizeData.startY;
+    const p = resizeData.pos;
+
+    if (p.includes('r') || p === 't' || p === 'b') {
+      if (p.includes('r')) resizeData.el.style.width = Math.max(20, resizeData.origWidth + dx) + 'px';
+    }
+    if (p.includes('l')) {
+      resizeData.el.style.width = Math.max(20, resizeData.origWidth - dx) + 'px';
+    }
+    if (p.includes('b') || p === 'l' || p === 'r') {
+      if (p.includes('b')) resizeData.el.style.height = Math.max(20, resizeData.origHeight + dy) + 'px';
+    }
+    if (p.includes('t')) {
+      resizeData.el.style.height = Math.max(20, resizeData.origHeight - dy) + 'px';
+    }
+    // 边中只调整单方向
+    if (p === 'r' || p === 'l') {
+      resizeData.el.style.width = Math.max(20, resizeData.origWidth + (p === 'r' ? dx : -dx)) + 'px';
+    }
+    if (p === 't' || p === 'b') {
+      resizeData.el.style.height = Math.max(20, resizeData.origHeight + (p === 'b' ? dy : -dy)) + 'px';
+    }
+
+    repositionHandles();
+  };
+
+  const onUp = () => {
+    doc.removeEventListener('mousemove', onMove, true);
+    doc.removeEventListener('mouseup', onUp, true);
+    pushUndo();
+    markDirty();
+    updatePanel();
+    resizeData = null;
+  };
+
+  doc.addEventListener('mousemove', onMove, true);
+  doc.addEventListener('mouseup', onUp, true);
+  e.preventDefault();
+  e.stopPropagation();
+}
+
+// ===================================================================
+//  页面跳转链接配置 (Phase 6)
+// ===================================================================
+function updateLinkSection(el) {
+  const tag = el.tagName.toLowerCase();
+  const isLinkable = (tag === 'a' || tag === 'button' || tag === 'div' || tag === 'span');
+  $('linkSection').style.display = isLinkable ? 'block' : 'none';
+
+  if (!isLinkable) return;
+
+  // 填充同项目内的 HTML 文件列表
+  const select = $('propPageLink');
+  select.innerHTML = '<option value="">-- 不设置 --</option>';
+
+  const fileItems = document.querySelectorAll('#fileTree .file-item[data-path]');
+  fileItems.forEach(item => {
+    const path = item.dataset.path;
+    const name = item.querySelector('.name')?.textContent || path;
+    if (path && path.endsWith('.html')) {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      select.appendChild(opt);
+    }
+  });
+
+  // 回显当前值
+  const currentHref = el.getAttribute('href') || el.getAttribute('onclick') || '';
+  for (const opt of select.options) {
+    if (currentHref.includes(opt.value)) {
+      opt.selected = true;
+      break;
+    }
+  }
+}
+
+function setPageLink(value) {
+  if (!selectedElement) return;
+  pushUndo();
+  if (selectedElement.tagName.toLowerCase() === 'a') {
+    selectedElement.setAttribute('href', value || '#');
+  } else {
+    if (value) {
+      selectedElement.setAttribute('onclick', `window.location.href='${value}'`);
+      selectedElement.style.cursor = 'pointer';
+    } else {
+      selectedElement.removeAttribute('onclick');
+      selectedElement.style.cursor = '';
+    }
+  }
+  markDirty();
 }
 
 function updatePanel() {
@@ -1288,9 +1728,252 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ===================================================================
+//  最近文件管理
+// ===================================================================
+function addRecentFile(filePath, fileName) {
+  recentFiles = recentFiles.filter(f => f.path !== filePath);
+  recentFiles.unshift({ path: filePath, name: fileName, time: Date.now() });
+  if (recentFiles.length > 10) recentFiles.pop();
+  localStorage.setItem('recentFiles', JSON.stringify(recentFiles));
+  renderRecentFiles();
+}
+
+function renderRecentFiles() {
+  const wrap = $('recentFilesWrap');
+  const list = $('recentFilesList');
+  if (!recentFiles.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  list.innerHTML = recentFiles.slice(0, 5).map(f => {
+    const escapedPath = f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    return `<div class="file-item" onclick="openFile('${escapedPath}')" style="padding:5px 16px;font-size:12px;">
+      <span class="icon" style="font-size:12px;">📄</span><span class="name">${f.name}</span>
+    </div>`;
+  }).join('');
+}
+
+function clearRecentFiles() {
+  recentFiles = [];
+  localStorage.removeItem('recentFiles');
+  renderRecentFiles();
+}
+
+// ===================================================================
+//  侧边栏 Tab 切换
+// ===================================================================
+function switchSidebarTab(tabName) {
+  document.querySelectorAll('.sidebar-tab').forEach((btn, i) => {
+    btn.classList.toggle('active', (i === 0 && tabName === 'files') || (i === 1 && tabName === 'components'));
+  });
+  $('panelFiles').classList.toggle('active', tabName === 'files');
+  $('panelComponents').classList.toggle('active', tabName === 'components');
+}
+
+// ===================================================================
+//  组件库定义 (30+ 组件)
+// ===================================================================
+const COMPONENT_LIBRARY = [
+  {
+    category: '基础元素', icon: '📝',
+    items: [
+      { name: '文本段落', html: '<p style="font-size:14px;line-height:1.6;color:#333;margin:8px 0;">请输入一段文本内容</p>' },
+      { name: '标题 H1', html: '<h1 style="font-size:28px;font-weight:700;color:#1a1a2e;margin:12px 0;">一级标题</h1>' },
+      { name: '标题 H2', html: '<h2 style="font-size:22px;font-weight:600;color:#1a1a2e;margin:10px 0;">二级标题</h2>' },
+      { name: '标题 H3', html: '<h3 style="font-size:18px;font-weight:600;color:#333;margin:8px 0;">三级标题</h3>' },
+      { name: '分割线', html: '<hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0;">' },
+      { name: '图片占位', html: '<div style="width:200px;height:140px;background:#f3f4f6;border:2px dashed #d1d5db;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:13px;">🖼️ 图片占位</div>' },
+    ]
+  },
+  {
+    category: '表单控件', icon: '📋',
+    items: [
+      { name: '输入框', html: '<input type="text" placeholder="请输入..." style="width:220px;height:36px;padding:0 12px;border:1px solid #d1d5db;border-radius:6px;font-size:14px;outline:none;font-family:inherit;">' },
+      { name: '下拉选择', html: '<select style="width:220px;height:36px;padding:0 12px;border:1px solid #d1d5db;border-radius:6px;font-size:14px;background:#fff;font-family:inherit;"><option>请选择...</option><option>选项一</option><option>选项二</option><option>选项三</option></select>' },
+      { name: '复选框', html: '<label style="display:flex;align-items:center;gap:8px;font-size:14px;color:#333;cursor:pointer;"><input type="checkbox" style="width:16px;height:16px;"> 复选选项</label>' },
+      { name: '单选框', html: '<label style="display:flex;align-items:center;gap:8px;font-size:14px;color:#333;cursor:pointer;"><input type="radio" name="radio-group" style="width:16px;height:16px;"> 单选选项</label>' },
+      { name: '开关', html: '<div style="width:44px;height:24px;background:#d1d5db;border-radius:12px;position:relative;cursor:pointer;"><div style="width:20px;height:20px;background:#fff;border-radius:50%;position:absolute;top:2px;left:2px;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div></div>' },
+      { name: '搜索框', html: '<div style="position:relative;width:240px;"><input type="search" placeholder="搜索..." style="width:100%;height:36px;padding:0 12px 0 36px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;outline:none;font-family:inherit;"><span style="position:absolute;left:12px;top:9px;color:#9ca3af;">🔍</span></div>' },
+      { name: '日期选择', html: '<input type="date" style="width:180px;height:36px;padding:0 12px;border:1px solid #d1d5db;border-radius:6px;font-size:14px;font-family:inherit;">' },
+    ]
+  },
+  {
+    category: '按钮类', icon: '🔘',
+    items: [
+      { name: '主按钮', html: '<button style="padding:10px 24px;background:#6c5ce7;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(108,92,231,0.3);">主按钮</button>' },
+      { name: '次按钮', html: '<button style="padding:10px 24px;background:transparent;color:#6c5ce7;border:1.5px solid #6c5ce7;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;">次按钮</button>' },
+      { name: '文字链接', html: '<a href="#" style="color:#6c5ce7;font-size:14px;text-decoration:none;border-bottom:1px solid transparent;" onmouseover="this.style.borderBottomColor=\'#6c5ce7\'" onmouseout="this.style.borderBottomColor=\'transparent\'">文字链接 →</a>' },
+      { name: '危险按钮', html: '<button style="padding:10px 24px;background:#e17055;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;">删除</button>' },
+    ]
+  },
+  {
+    category: '容器类', icon: '📦',
+    items: [
+      { name: '卡片', html: '<div style="padding:20px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);min-width:200px;"><h4 style="font-size:16px;font-weight:600;margin:0 0 8px;">卡片标题</h4><p style="font-size:13px;color:#6b7280;margin:0;">卡片描述文字</p></div>' },
+      { name: '弹窗', html: '<div style="width:400px;background:#fff;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.15);overflow:hidden;"><div style="padding:16px 20px;border-bottom:1px solid #e5e7eb;font-weight:600;">弹窗标题</div><div style="padding:20px;font-size:14px;color:#555;">弹窗内容区域</div><div style="padding:12px 20px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:8px;"><button style="padding:8px 16px;border:1px solid #d1d5db;background:#fff;border-radius:6px;cursor:pointer;font-family:inherit;">取消</button><button style="padding:8px 16px;background:#6c5ce7;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;">确定</button></div></div>' },
+      { name: '选项卡', html: '<div><div style="display:flex;border-bottom:2px solid #e5e7eb;"><span style="padding:10px 20px;font-size:14px;font-weight:500;color:#6c5ce7;border-bottom:2px solid #6c5ce7;margin-bottom:-2px;cursor:pointer;">标签一</span><span style="padding:10px 20px;font-size:14px;color:#9ca3af;cursor:pointer;">标签二</span><span style="padding:10px 20px;font-size:14px;color:#9ca3af;cursor:pointer;">标签三</span></div><div style="padding:16px;font-size:14px;color:#555;">标签内容区域</div></div>' },
+      { name: '表格', html: '<table style="width:100%;border-collapse:collapse;font-size:14px;"><thead><tr style="background:#f9fafb;"><th style="padding:10px 16px;text-align:left;border-bottom:2px solid #e5e7eb;font-weight:600;">列标题 A</th><th style="padding:10px 16px;text-align:left;border-bottom:2px solid #e5e7eb;font-weight:600;">列标题 B</th><th style="padding:10px 16px;text-align:left;border-bottom:2px solid #e5e7eb;font-weight:600;">操作</th></tr></thead><tbody><tr><td style="padding:10px 16px;border-bottom:1px solid #f3f4f6;">数据 1</td><td style="padding:10px 16px;border-bottom:1px solid #f3f4f6;">描述</td><td style="padding:10px 16px;border-bottom:1px solid #f3f4f6;"><a href="#" style="color:#6c5ce7;text-decoration:none;">编辑</a></td></tr><tr><td style="padding:10px 16px;border-bottom:1px solid #f3f4f6;">数据 2</td><td style="padding:10px 16px;border-bottom:1px solid #f3f4f6;">描述</td><td style="padding:10px 16px;border-bottom:1px solid #f3f4f6;"><a href="#" style="color:#6c5ce7;text-decoration:none;">编辑</a></td></tr></tbody></table>' },
+    ]
+  },
+  {
+    category: '导航类', icon: '🧭',
+    items: [
+      { name: '顶部导航', html: '<nav style="display:flex;align-items:center;justify-content:space-between;padding:12px 24px;background:#fff;border-bottom:1px solid #e5e7eb;"><span style="font-weight:700;font-size:16px;color:#1a1a2e;">Logo</span><div style="display:flex;gap:24px;"><a href="#" style="color:#555;text-decoration:none;font-size:14px;">首页</a><a href="#" style="color:#6c5ce7;text-decoration:none;font-size:14px;font-weight:500;">产品</a><a href="#" style="color:#555;text-decoration:none;font-size:14px;">关于</a></div></nav>' },
+      { name: '面包屑', html: '<nav style="display:flex;align-items:center;gap:8px;font-size:13px;"><a href="#" style="color:#6c5ce7;text-decoration:none;">首页</a><span style="color:#d1d5db;">/</span><a href="#" style="color:#6c5ce7;text-decoration:none;">产品列表</a><span style="color:#d1d5db;">/</span><span style="color:#6b7280;">详情</span></nav>' },
+      { name: '分页器', html: '<div style="display:flex;align-items:center;gap:4px;"><button style="width:32px;height:32px;border:1px solid #d1d5db;background:#fff;border-radius:6px;cursor:pointer;">«</button><button style="width:32px;height:32px;border:none;background:#6c5ce7;color:#fff;border-radius:6px;cursor:pointer;font-weight:600;">1</button><button style="width:32px;height:32px;border:1px solid #d1d5db;background:#fff;border-radius:6px;cursor:pointer;">2</button><button style="width:32px;height:32px;border:1px solid #d1d5db;background:#fff;border-radius:6px;cursor:pointer;">3</button><button style="width:32px;height:32px;border:1px solid #d1d5db;background:#fff;border-radius:6px;cursor:pointer;">»</button></div>' },
+    ]
+  },
+  {
+    category: '反馈类', icon: '💬',
+    items: [
+      { name: '成功提示', html: '<div style="padding:12px 16px;background:#d5f5e3;color:#1e8449;border-radius:8px;font-size:14px;display:flex;align-items:center;gap:8px;">✅ 操作成功完成</div>' },
+      { name: '警告提示', html: '<div style="padding:12px 16px;background:#fef3cd;color:#856404;border-radius:8px;font-size:14px;display:flex;align-items:center;gap:8px;">⚠️ 请注意检查</div>' },
+      { name: '进度条', html: '<div style="width:200px;"><div style="display:flex;justify-content:space-between;font-size:12px;color:#6b7280;margin-bottom:4px;"><span>进度</span><span>65%</span></div><div style="width:100%;height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden;"><div style="width:65%;height:100%;background:linear-gradient(90deg,#6c5ce7,#a29bfe);border-radius:4px;"></div></div></div>' },
+      { name: '徽标', html: '<span style="display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;background:#e17055;color:#fff;border-radius:10px;font-size:11px;font-weight:600;">5</span>' },
+      { name: '标签', html: '<div style="display:flex;gap:6px;"><span style="padding:4px 10px;background:#f0eeff;color:#6c5ce7;border-radius:100px;font-size:12px;font-weight:500;">标签 A</span><span style="padding:4px 10px;background:#d5f5e3;color:#1e8449;border-radius:100px;font-size:12px;font-weight:500;">标签 B</span><span style="padding:4px 10px;background:#fef3cd;color:#856404;border-radius:100px;font-size:12px;font-weight:500;">标签 C</span></div>' },
+    ]
+  }
+];
+
+// ===================================================================
+//  组件面板渲染
+// ===================================================================
+function renderComponentPanel(filter = '') {
+  const tree = $('compTree');
+  const lowerFilter = filter.toLowerCase();
+  let html = '';
+
+  COMPONENT_LIBRARY.forEach((group, gi) => {
+    const filteredItems = group.items.filter(item =>
+      !lowerFilter || item.name.toLowerCase().includes(lowerFilter)
+    );
+    if (!filteredItems.length) return;
+
+    html += `<button class="comp-group-title" onclick="toggleCompGroup(this)">
+      <span>${group.icon} ${group.category}</span>
+      <span class="arrow">▼</span>
+    </button>`;
+    html += `<div class="comp-group-items">`;
+    filteredItems.forEach((item, ii) => {
+      html += `<div class="comp-item" draggable="true"
+        ondragstart="onCompDragStart(event, ${gi}, ${group.items.indexOf(item)})">
+        <span class="comp-icon">${group.icon}</span>
+        <span>${item.name}</span>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+
+  tree.innerHTML = html || '<div class="file-tree-empty">没有匹配的组件</div>';
+}
+
+function toggleCompGroup(btn) {
+  btn.classList.toggle('collapsed');
+  const items = btn.nextElementSibling;
+  if (items) items.classList.toggle('collapsed');
+}
+
+function filterComponents() {
+  renderComponentPanel($('compSearchInput').value.trim());
+}
+
+// ===================================================================
+//  组件拖拽 (Phase 4 核心 - 跨 iframe 解决方案)
+// ===================================================================
+let dragComponentData = null;
+
+function onCompDragStart(e, groupIdx, itemIdx) {
+  dragComponentData = COMPONENT_LIBRARY[groupIdx].items[itemIdx];
+  e.dataTransfer.effectAllowed = 'copy';
+  e.dataTransfer.setData('text/plain', 'component');
+  // 显示透明遮罩层截获拖拽事件
+  const overlay = $('dropOverlay');
+  if (overlay) overlay.classList.add('active');
+}
+
+// 画布区域接收拖拽
+function setupCanvasDrop() {
+  const overlay = $('dropOverlay');
+
+  // dragover: 允许释放 + 视觉反馈
+  overlay.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    overlay.classList.add('drag-over');
+  });
+
+  overlay.addEventListener('dragleave', function(e) {
+    overlay.classList.remove('drag-over');
+  });
+
+  // drop: 插入组件到 iframe
+  overlay.addEventListener('drop', function(e) {
+    e.preventDefault();
+    overlay.classList.remove('active', 'drag-over');
+
+    if (!dragComponentData) return;
+
+    const iframe = $('previewFrame');
+    const doc = iframe.contentDocument;
+    if (!doc || !doc.body) {
+      showToast('请先打开一个 HTML 文件', 'error');
+      dragComponentData = null;
+      return;
+    }
+
+    pushUndo();
+
+    // 创建临时容器解析 HTML
+    const temp = doc.createElement('div');
+    temp.innerHTML = dragComponentData.html;
+    const newEl = temp.firstElementChild || temp.firstChild;
+
+    if (newEl) {
+      // 计算鼠标在 iframe 内的坐标，找到目标插入位置
+      const iframeRect = iframe.getBoundingClientRect();
+      const targetEl = doc.elementFromPoint(
+        e.clientX - iframeRect.left,
+        e.clientY - iframeRect.top
+      );
+
+      if (targetEl && targetEl !== doc.body && targetEl !== doc.documentElement) {
+        // 在目标元素后面插入
+        targetEl.parentNode.insertBefore(newEl, targetEl.nextSibling);
+      } else {
+        doc.body.appendChild(newEl);
+      }
+
+      // 滚动新元素到可见区域
+      newEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      selectElement(newEl);
+      markDirty();
+      showToast('已添加: ' + dragComponentData.name, 'success');
+    }
+
+    dragComponentData = null;
+  });
+
+  // 全局拖拽结束：清理 overlay
+  document.addEventListener('dragend', function() {
+    overlay.classList.remove('active', 'drag-over');
+    dragComponentData = null;
+  });
+}
+
+// ===================================================================
 //  初始化
 // ===================================================================
 bindPanelEvents();
+renderRecentFiles();
+renderComponentPanel();
+setupCanvasDrop();
+
+// 自动恢复上次目录
+(function restoreLastDir() {
+  const lastDir = localStorage.getItem('lastDir');
+  if (lastDir) {
+    $('dirInput').value = lastDir;
+    loadDirectory(lastDir);
+  }
+})();
 </script>
 </body>
 </html>

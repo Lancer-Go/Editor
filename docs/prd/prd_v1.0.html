@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HTML 原型可视化编辑器 — PRD v1.0</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ===== 全局 ===== */
+:root {
+  --bg: #f8f9fc;
+  --surface: #ffffff;
+  --text: #1a1d2e;
+  --text-secondary: #5a6178;
+  --border: #e2e5f1;
+  --accent: #6c5ce7;
+  --accent-light: #f0eeff;
+  --accent-dark: #5a4bd6;
+  --success: #00b894;
+  --warning: #fdcb6e;
+  --danger: #e17055;
+  --radius: 12px;
+  --shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  font-size: 15px;
+}
+
+/* ===== 侧边目录导航 ===== */
+.toc-nav {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 260px;
+  height: 100vh;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 24px 0;
+  overflow-y: auto;
+  z-index: 100;
+  box-shadow: 2px 0 12px rgba(0,0,0,0.03);
+}
+
+.toc-nav .toc-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-secondary);
+  padding: 0 24px;
+  margin-bottom: 16px;
+}
+
+.toc-nav a {
+  display: block;
+  padding: 8px 24px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  border-left: 3px solid transparent;
+  transition: all 0.2s;
+}
+
+.toc-nav a:hover {
+  color: var(--accent);
+  background: var(--accent-light);
+  border-left-color: var(--accent);
+}
+
+.toc-nav a.level-2 { padding-left: 36px; font-size: 12px; }
+.toc-nav a.level-3 { padding-left: 48px; font-size: 12px; opacity: 0.8; }
+
+/* ===== 主内容 ===== */
+.main-content {
+  margin-left: 260px;
+  max-width: 900px;
+  padding: 40px 48px 80px;
+}
+
+/* ===== 版本信息头 ===== */
+.doc-header {
+  margin-bottom: 48px;
+  padding-bottom: 32px;
+  border-bottom: 2px solid var(--border);
+}
+
+.doc-header h1 {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.meta-item {
+  background: var(--bg);
+  padding: 14px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.meta-item .label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.meta-item .value {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ===== 章节标题 ===== */
+h2 {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 48px 0 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+h2 .num {
+  color: var(--accent);
+  margin-right: 8px;
+}
+
+h3 {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 28px 0 12px;
+  color: var(--text);
+}
+
+h4 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 20px 0 8px;
+  color: var(--text-secondary);
+}
+
+/* ===== 表格 ===== */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0 24px;
+  font-size: 14px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+thead th {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 12px 16px;
+  text-align: left;
+}
+
+tbody td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: var(--accent-light); }
+
+/* ===== 标签和状态 ===== */
+.tag {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.tag-p1 { background: #ffe0db; color: #c0392b; }
+.tag-p4 { background: #fff3cd; color: #856404; }
+.tag-p5 { background: #d6eaf8; color: #2471a3; }
+.tag-done { background: #d5f5e3; color: #1e8449; }
+
+/* ===== 卡片 ===== */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin: 16px 0;
+  box-shadow: var(--shadow);
+}
+
+.card-accent {
+  border-left: 4px solid var(--accent);
+}
+
+/* ===== 列表 ===== */
+ul, ol {
+  padding-left: 20px;
+  margin: 8px 0 16px;
+}
+
+li {
+  margin-bottom: 6px;
+}
+
+/* ===== 流程图占位 ===== */
+.placeholder {
+  background: var(--bg);
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 40px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin: 16px 0;
+}
+
+/* ===== 用户旅程表 ===== */
+.journey-table td:first-child {
+  font-weight: 600;
+  white-space: nowrap;
+  width: 100px;
+}
+
+/* ===== 响应式 ===== */
+@media (max-width: 960px) {
+  .toc-nav { display: none; }
+  .main-content { margin-left: 0; padding: 24px; }
+}
+
+/* ===== 版本记录表格 ===== */
+.version-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: var(--accent-light);
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* ===== 引用/注释块 ===== */
+blockquote {
+  border-left: 4px solid var(--accent);
+  background: var(--accent-light);
+  padding: 16px 20px;
+  margin: 16px 0;
+  border-radius: 0 8px 8px 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* ===== 分组布局 ===== */
+.component-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.component-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.component-card h5 {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.component-card ul {
+  font-size: 13px;
+  margin: 0;
+  padding-left: 18px;
+}
+/* Mermaid containers */
+.mermaid-wrap {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin: 16px 0;
+  overflow-x: auto;
+}
+
+.feature-module {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin: 24px 0;
+}
+
+.feature-module h4 { margin-top: 0; }
+
+.feature-content {
+  display: flex;
+  gap: 24px;
+  margin-top: 16px;
+}
+
+.logic-rules { flex: 1; }
+
+.sandbox-preview iframe {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+</style>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+</script>
+</head>
+<body>
+
+<!-- ===== 侧边目录 ===== -->
+<nav class="toc-nav">
+  <div class="toc-title">📄 目录导航</div>
+  <a href="#info">项目信息与版本记录</a>
+  <a href="#background" class="level-2">一、需求背景</a>
+  <a href="#goals" class="level-2">二、需求目标</a>
+  <a href="#users" class="level-2">三、用户与使用场景</a>
+  <a href="#journey" class="level-3">用户旅程图</a>
+  <a href="#features" class="level-2">四、需求功能清单</a>
+  <a href="#detail" class="level-2">五、详细方案</a>
+  <a href="#detail-components" class="level-3">5.1 组件面板与拖拽</a>
+  <a href="#detail-alignment" class="level-3">5.2 智能对齐辅助线</a>
+  <a href="#detail-project" class="level-3">5.3 项目级多页面管理</a>
+  <a href="#detail-filebrowser" class="level-3">5.4 文件浏览优化</a>
+  <a href="#detail-export" class="level-3">5.5 导出功能</a>
+  <a href="#detail-source" class="level-3">5.6 源码编辑模式</a>
+  <a href="#flowcharts" class="level-2">六、业务流程图</a>
+  <a href="#edge-cases" class="level-2">七、异常与边界处理</a>
+  <a href="#roadmap" class="level-2">八、未来演进规划</a>
+  <a href="#appendix" class="level-2">九、附件</a>
+</nav>
+
+<!-- ===== 主内容 ===== -->
+<div class="main-content">
+
+  <!-- ===== 项目信息 ===== -->
+  <section id="info">
+    <div class="doc-header">
+      <h1>🎨 HTML 原型可视化编辑器</h1>
+      <p style="color:var(--text-secondary); font-size: 16px; margin-top: 4px;">产品需求文档 (PRD) — 最终版（含原型切片与流程图）</p>
+      <div class="meta-grid">
+        <div class="meta-item">
+          <div class="label">版本</div>
+          <div class="value"><span class="version-badge">📋 v1.0 初版</span></div>
+        </div>
+        <div class="meta-item">
+          <div class="label">创建日期</div>
+          <div class="value">2026-03-30</div>
+        </div>
+        <div class="meta-item">
+          <div class="label">产品负责人</div>
+          <div class="value">—</div>
+        </div>
+        <div class="meta-item">
+          <div class="label">项目状态</div>
+          <div class="value" style="color:var(--accent)">需求定义阶段</div>
+        </div>
+        <div class="meta-item">
+          <div class="label">技术栈</div>
+          <div class="value">Node.js + Express + 原生 HTML/JS</div>
+        </div>
+        <div class="meta-item">
+          <div class="label">开源计划</div>
+          <div class="value" style="color:var(--success)">✅ 计划开源</div>
+        </div>
+      </div>
+
+      <h4 style="margin-top: 24px;">版本记录</h4>
+      <table>
+        <thead><tr><th>版本</th><th>日期</th><th>变更说明</th><th>状态</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="tag tag-done">v1.0</span></td>
+            <td>2026-03-30</td>
+            <td>初版 PRD — 需求采集与功能定义</td>
+            <td>当前版本</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===== 一、需求背景 ===== -->
+  <section id="background">
+    <h2><span class="num">一、</span>需求背景</h2>
+
+    <h3>1.1 现状问题</h3>
+    <p>随着 AI 编码助手（如 Cursor、Antigravity、Claude）的普及，产品经理（PM）越来越多地使用 AI 直接生成 HTML 高保真原型。然而，AI 产出的原型通常需要微调——修改文案、调整布局、增删组件——而 PM 通常不具备前端编码能力。</p>
+
+    <div class="card card-accent">
+      <h4>核心矛盾</h4>
+      <p><strong>"AI 能快速生成原型，但 PM 无法快速修改原型"</strong></p>
+      <ul>
+        <li>让 AI 反复修改效率低，一个文案改动需要重新描述需求、等待生成</li>
+        <li>手写 HTML/CSS 对 PM 门槛太高</li>
+        <li>墨刀、Axure 等原型工具无法直接编辑 AI 产出的 HTML 文件</li>
+      </ul>
+    </div>
+
+    <h3>1.2 为什么现在做</h3>
+    <ul>
+      <li>AI 原型工作流正在被越来越多 PM 采用，"AI 生成 + 人工微调"的需求迫切</li>
+      <li>现有项目已有一个可用的雏形，具备基本编辑能力，有迭代基础</li>
+      <li>市面上没有专门面向"编辑 AI 生成 HTML 原型"场景的轻量级工具</li>
+    </ul>
+  </section>
+
+  <!-- ===== 二、需求目标 ===== -->
+  <section id="goals">
+    <h2><span class="num">二、</span>需求目标</h2>
+    <table>
+      <thead><tr><th>目标类型</th><th>描述</th><th>衡量指标</th><th>目标值</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>核心体验</strong></td>
+          <td>PM 能像用墨刀一样拖拽组件编辑 HTML 原型</td>
+          <td>组件添加到画布的操作步骤</td>
+          <td>≤ 2 步（拖 + 放）</td>
+        </tr>
+        <tr>
+          <td><strong>效率提升</strong></td>
+          <td>原型微调不再依赖 AI 反复修改</td>
+          <td>单次文案/布局微调耗时</td>
+          <td>≤ 30 秒</td>
+        </tr>
+        <tr>
+          <td><strong>交付能力</strong></td>
+          <td>原型可直接导出用于 PRD 写作和存档</td>
+          <td>批量导出完成时间</td>
+          <td>≤ 10 秒 / 页</td>
+        </tr>
+        <tr>
+          <td><strong>开源价值</strong></td>
+          <td>项目开源，吸引社区参与完善</td>
+          <td>代码可读性 & 架构清晰度</td>
+          <td>新贡献者 30 分钟内能理解核心结构</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ===== 三、用户与使用场景 ===== -->
+  <section id="users">
+    <h2><span class="num">三、</span>用户与使用场景</h2>
+
+    <h3>3.1 典型用户画像</h3>
+    <div class="card">
+      <h4>👤 小李 — 初级产品经理</h4>
+      <ul>
+        <li><strong>背景</strong>：2 年工作经验，会使用墨刀画原型，最近开始使用 AI 工具辅助工作</li>
+        <li><strong>技术能力</strong>：不会写代码，能看懂简单的 HTML 结构</li>
+        <li><strong>工作流</strong>：用 AI（Cursor / Antigravity）生成 HTML 原型 → 需要微调文案和布局 → 截图嵌入 PRD</li>
+        <li><strong>痛点</strong>：AI 生成的原型总是差那么一点，让 AI 改来改去不如自己动手，但自己不会写代码</li>
+      </ul>
+    </div>
+
+    <h3 id="journey">3.2 用户旅程图 (User Journey Map)</h3>
+    <table class="journey-table">
+      <thead><tr><th>阶段</th><th>用户触点</th><th>用户行为</th><th>痛点 / 情绪</th><th>产品机会点</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>① 启动</td>
+          <td>双击 start.bat 或命令行</td>
+          <td>启动编辑器，浏览器自动打开</td>
+          <td>😊 启动简单</td>
+          <td>保持零配置启动体验</td>
+        </tr>
+        <tr>
+          <td>② 打开项目</td>
+          <td>文件浏览面板</td>
+          <td>输入项目文件夹路径 → 看到 HTML 文件列表</td>
+          <td>😤 每次都要手动输路径，不记得上次的目录</td>
+          <td>✅ 记住上次目录 + 最近文件列表 + 拖拽打开</td>
+        </tr>
+        <tr>
+          <td>③ 加载原型</td>
+          <td>画布预览区</td>
+          <td>点击 HTML 文件 → 原型在画布中展示</td>
+          <td>😊 预览效果不错</td>
+          <td>保持 iframe 预览 + 资源代理机制</td>
+        </tr>
+        <tr>
+          <td>④ 修改文案</td>
+          <td>画布 + 右侧面板</td>
+          <td>双击文字直接编辑，或在面板修改</td>
+          <td>😊 这部分体验还行</td>
+          <td>优化：修改后实时同步到面板</td>
+        </tr>
+        <tr>
+          <td>⑤ 添加组件</td>
+          <td>组件面板（当前不存在❌）</td>
+          <td>想添加一个下拉框，但找不到地方</td>
+          <td>😡 <strong>核心痛点！</strong>无法新增元素</td>
+          <td>✅ 组件面板 + 拖拽添加 = 本次核心功能</td>
+        </tr>
+        <tr>
+          <td>⑥ 排版对齐</td>
+          <td>画布拖拽</td>
+          <td>拖动元素调整位置，但歪歪扭扭</td>
+          <td>😕 没有对齐提示，全凭感觉</td>
+          <td>✅ 智能对齐辅助线 + 吸附</td>
+        </tr>
+        <tr>
+          <td>⑦ 保存退出</td>
+          <td>Ctrl+S</td>
+          <td>保存文件，工具自动备份</td>
+          <td>😊 有备份很放心</td>
+          <td>保持自动备份机制</td>
+        </tr>
+        <tr>
+          <td>⑧ 导出交付</td>
+          <td>导出功能（当前不存在❌）</td>
+          <td>想把原型截图放进 PRD</td>
+          <td>😤 只能手动截图，多页面截到崩溃</td>
+          <td>✅ 批量导出 PNG/PDF</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ===== 四、需求功能清单 ===== -->
+  <section id="features">
+    <h2><span class="num">四、</span>需求功能清单</h2>
+
+    <table>
+      <thead><tr><th>模块</th><th>功能</th><th>优先级</th><th>描述</th></tr></thead>
+      <tbody>
+        <!-- P1 -->
+        <tr>
+          <td rowspan="6"><strong>组件面板</strong></td>
+          <td>基础元素</td>
+          <td><span class="tag tag-p1">P1</span></td>
+          <td>文本块、标题(H1-H6)、分割线、图片占位、图标</td>
+        </tr>
+        <tr>
+          <td>表单控件</td>
+          <td><span class="tag tag-p1">P1</span></td>
+          <td>输入框、下拉框、复选框、单选框、开关、搜索框、日期选择器</td>
+        </tr>
+        <tr>
+          <td>按钮类</td>
+          <td><span class="tag tag-p1">P1</span></td>
+          <td>主按钮、次按钮、文字链接、图标按钮</td>
+        </tr>
+        <tr>
+          <td>容器类</td>
+          <td><span class="tag tag-p1">P1</span></td>
+          <td>卡片、弹窗/模态框、选项卡(Tab)、折叠面板、表格</td>
+        </tr>
+        <tr>
+          <td>导航类</td>
+          <td><span class="tag tag-p1">P1</span></td>
+          <td>顶部导航栏、侧边菜单、面包屑、分页器</td>
+        </tr>
+        <tr>
+          <td>反馈类</td>
+          <td><span class="tag tag-p1">P1</span></td>
+          <td>Toast 提示、进度条、徽标(Badge)、标签(Tag)</td>
+        </tr>
+
+        <tr>
+          <td><strong>拖拽引擎</strong></td>
+          <td>拖拽添加 + 自由移动</td>
+          <td><span class="tag tag-p1">P1</span></td>
+          <td>从组件面板拖入画布插入元素，画布上自由拖动定位</td>
+        </tr>
+
+        <tr>
+          <td><strong>智能对齐</strong></td>
+          <td>辅助线 + 吸附</td>
+          <td><span class="tag tag-p1">P1</span></td>
+          <td>拖拽时自动显示边缘/中心对齐线，接近时自动吸附</td>
+        </tr>
+
+        <tr>
+          <td rowspan="4"><strong>文件与项目</strong></td>
+          <td>修复导航 Bug</td>
+          <td><span class="tag tag-p1">P1</span></td>
+          <td>空文件夹无法返回上一级</td>
+        </tr>
+        <tr>
+          <td>记忆目录</td>
+          <td><span class="tag tag-p1">P1</span></td>
+          <td>localStorage 记住上次打开的目录</td>
+        </tr>
+        <tr>
+          <td>最近文件</td>
+          <td><span class="tag tag-p1">P1</span></td>
+          <td>最近打开文件列表，快速跳转</td>
+        </tr>
+        <tr>
+          <td>项目管理</td>
+          <td><span class="tag tag-p1">P1</span></td>
+          <td>多页面统一管理 + 页面间跳转链接</td>
+        </tr>
+
+        <tr>
+          <td><strong>导出</strong></td>
+          <td>批量导出 PNG/PDF</td>
+          <td><span class="tag tag-p4">P4</span></td>
+          <td>选择单页/多页，导出为图片或 PDF，嵌入 PRD / 存档</td>
+        </tr>
+
+        <tr>
+          <td><strong>源码编辑</strong></td>
+          <td>双向同步代码编辑器</td>
+          <td><span class="tag tag-p5">P5</span></td>
+          <td>可视化 ↔ 源码切换，语法高亮，实时同步</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ===== 五、详细方案 ===== -->
+  <section id="detail">
+    <h2><span class="num">五、</span>详细方案</h2>
+    <blockquote>
+      以下各功能模块均包含：<strong>交互流程图</strong>（Mermaid）、<strong>详细规则描述</strong>、<strong>原型沙盒切片</strong>（iframe 嵌入）。
+    </blockquote>
+
+    <!-- 5.1 组件面板 -->
+    <h3 id="detail-components">5.1 组件面板与拖拽添加</h3>
+
+    <div class="feature-module">
+      <div class="feature-content">
+        <div class="logic-rules">
+          <h4>交互流程图</h4>
+          <div class="mermaid-wrap"><pre class="mermaid">
+flowchart TD
+  A["鼠标按住组件缩略图"] --> B{"画布已加载文件?"}
+  B -- 否 --> C["Toast: 请先打开文件"]
+  B -- 是 --> D["显示拖拽幽灵预览"]
+  D --> E["移入 iframe 画布"]
+  E --> F["显示蓝色插入指示线"]
+  F --> G{"释放位置合法?"}
+  G -- 画布外 --> H["取消操作"]
+  G -- 有效位置 --> I["插入 HTML 片段"]
+  I --> J["自动选中 + 显示属性"]
+  J --> K["pushUndo + markDirty"]
+          </pre></div>
+        </div>
+        <div class="sandbox-preview">
+          <h4>原型预览：组件面板</h4>
+          <iframe src="../prototype/prototype_v1.0.html?focus=left-sidebar" style="width:380px; height:500px; border:none;" sandbox="allow-scripts allow-same-origin"></iframe>
+        </div>
+      </div>
+    </div>
+
+    <h4>交互逻辑</h4>
+    <ol>
+      <li>左侧文件浏览面板上方新增「📦 组件」Tab，与「📂 文件」Tab 切换</li>
+      <li>组件面板按类别分组折叠展示（基础 / 表单 / 按钮 / 容器 / 导航 / 反馈）</li>
+      <li>用户鼠标按住组件缩略图 → 拖拽至画布 → 释放时在鼠标位置插入对应 HTML 元素</li>
+      <li>插入后自动选中该元素，右侧属性面板显示其属性</li>
+    </ol>
+
+    <h4>组件模板定义</h4>
+    <p>每个组件对应一段预设的 HTML 片段。组件清单：</p>
+    <div class="component-grid">
+      <div class="component-card">
+        <h5>📝 基础元素</h5>
+        <ul>
+          <li>文本段落 <code>&lt;p&gt;</code></li>
+          <li>标题 <code>&lt;h1&gt;</code> ~ <code>&lt;h6&gt;</code></li>
+          <li>分割线 <code>&lt;hr&gt;</code></li>
+          <li>图片占位 <code>&lt;div&gt;</code> + 占位图标</li>
+          <li>图标 <code>&lt;span&gt;</code> + SVG</li>
+        </ul>
+      </div>
+      <div class="component-card">
+        <h5>📋 表单控件</h5>
+        <ul>
+          <li>输入框 <code>&lt;input type="text"&gt;</code></li>
+          <li>下拉选择 <code>&lt;select&gt;</code></li>
+          <li>复选框 <code>&lt;input type="checkbox"&gt;</code></li>
+          <li>单选框 <code>&lt;input type="radio"&gt;</code></li>
+          <li>开关 Toggle</li>
+          <li>搜索框 <code>&lt;input type="search"&gt;</code></li>
+          <li>日期选择器 <code>&lt;input type="date"&gt;</code></li>
+        </ul>
+      </div>
+      <div class="component-card">
+        <h5>🔘 按钮类</h5>
+        <ul>
+          <li>主按钮（填充样式）</li>
+          <li>次按钮（描边样式）</li>
+          <li>文字链接</li>
+          <li>图标按钮</li>
+        </ul>
+      </div>
+      <div class="component-card">
+        <h5>📦 容器类</h5>
+        <ul>
+          <li>卡片容器</li>
+          <li>弹窗 / 模态框</li>
+          <li>选项卡 (Tab)</li>
+          <li>折叠面板 (Accordion)</li>
+          <li>数据表格</li>
+        </ul>
+      </div>
+      <div class="component-card">
+        <h5>🧭 导航类</h5>
+        <ul>
+          <li>顶部导航栏</li>
+          <li>侧边菜单</li>
+          <li>面包屑</li>
+          <li>分页器</li>
+        </ul>
+      </div>
+      <div class="component-card">
+        <h5>💬 反馈类</h5>
+        <ul>
+          <li>Toast 消息提示</li>
+          <li>进度条</li>
+          <li>徽标 (Badge)</li>
+          <li>标签 (Tag)</li>
+        </ul>
+      </div>
+    </div>
+
+    <h4>业务规则</h4>
+    <ul>
+      <li>组件拖入画布时，默认采用 <code>position: relative</code>，让元素参与正常文档流</li>
+      <li>如果画布区域不可见（如 iframe 未加载），拖入时给出提示：「请先打开一个 HTML 文件」</li>
+      <li>每个组件携带预设的 CSS 样式，确保拖入即美观</li>
+      <li>支持 Ctrl+Z 撤销刚插入的组件</li>
+    </ul>
+
+    <!-- 5.2 智能对齐 -->
+    <h3 id="detail-alignment">5.2 智能对齐辅助线</h3>
+
+    <div class="feature-module">
+      <div class="feature-content">
+        <div class="logic-rules">
+          <h4>交互流程图</h4>
+          <div class="mermaid-wrap"><pre class="mermaid">
+flowchart TD
+  A["mousedown 开始拖动"] --> B["计算拖拽元素六条线"]
+  B --> C["遍历同级可见元素"]
+  C --> D{"任意线距 ≤ 5px?"}
+  D -- 是 --> E["显示红色辅助线 + 吸附"]
+  D -- 否 --> F["隐藏辅助线"]
+  E --> G{"mouseup?"}
+  F --> G
+  G -- 否 --> B
+  G -- 是 --> H["隐藏辅助线 + pushUndo"]
+          </pre></div>
+        </div>
+        <div class="sandbox-preview">
+          <h4>原型预览：画布区域</h4>
+          <iframe src="../prototype/prototype_v1.0.html?focus=canvas-area" style="width:380px; height:400px; border:none;" sandbox="allow-scripts allow-same-origin"></iframe>
+        </div>
+      </div>
+    </div>
+
+    <h4>交互逻辑</h4>
+    <ol>
+      <li>拖拽移动元素时，实时计算与画布内其他可见元素的距离</li>
+      <li>当边缘或中心线对齐时（阈值 ≤ 5px），显示红色辅助线并自动吸附</li>
+      <li>对齐类型：
+        <ul>
+          <li>左边缘对齐、右边缘对齐、顶边对齐、底边对齐</li>
+          <li>水平中心对齐、垂直中心对齐</li>
+          <li>等距分布辅助线（多个元素间距相等时提示）</li>
+        </ul>
+      </li>
+      <li>松开鼠标后辅助线消失</li>
+    </ol>
+
+    <h4>业务规则</h4>
+    <ul>
+      <li>辅助线颜色：<span style="color:#e74c3c;">■</span> 红色实线（1px），确保在白/灰背景上醒目</li>
+      <li>吸附阈值：5px，超过则不吸附</li>
+      <li>性能：仅检查画布中可见的同层级元素（避免深层嵌套元素干扰）</li>
+    </ul>
+
+    <!-- 5.3 项目管理 -->
+    <h3 id="detail-project">5.3 项目级多页面管理</h3>
+
+    <h4>交互逻辑</h4>
+    <ol>
+      <li>将同一文件夹中的所有 HTML 文件视为一个「项目」</li>
+      <li>文件浏览器中展示项目视图：文件夹名即项目名，下属 HTML 文件为项目页面</li>
+      <li>页面间跳转链接配置：
+        <ul>
+          <li>选中一个按钮或链接元素 → 右侧面板出现「链接到」配置项</li>
+          <li>下拉列表显示同项目内的其他 HTML 页面</li>
+          <li>选择后自动设置元素的 <code>href</code> 属性指向目标页面文件名</li>
+        </ul>
+      </li>
+    </ol>
+
+    <!-- 5.4 文件浏览 -->
+    <h3 id="detail-filebrowser">5.4 文件浏览优化</h3>
+
+    <table>
+      <thead><tr><th>优化项</th><th>实现方式</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>🔴 修复空文件夹 Bug</td>
+          <td>空文件夹时仍显示「.. 返回上级」入口</td>
+        </tr>
+        <tr>
+          <td>记忆上次目录</td>
+          <td>将当前目录存入 <code>localStorage</code>，下次启动自动填充</td>
+        </tr>
+        <tr>
+          <td>最近文件列表</td>
+          <td>记录最近打开的 10 个文件路径，展示在文件面板顶部</td>
+        </tr>
+        <tr>
+          <td>拖拽文件夹打开</td>
+          <td>支持将系统文件夹拖入编辑器窗口，自动识别路径并打开</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- 5.5 导出 -->
+    <h3 id="detail-export">5.5 批量导出图片/PDF</h3>
+
+    <h4>交互逻辑</h4>
+    <ol>
+      <li>工具栏新增「📤 导出」按钮</li>
+      <li>点击弹出导出面板：
+        <ul>
+          <li>单页导出：导出当前打开的页面</li>
+          <li>批量导出：勾选项目中的多个页面</li>
+          <li>格式选择：PNG（默认）/ PDF</li>
+        </ul>
+      </li>
+      <li>后端使用 Puppeteer 或类似方案打开 HTML 并截图/生成 PDF</li>
+      <li>完成后提供下载链接或直接保存到项目 <code>exports/</code> 目录</li>
+    </ol>
+
+    <!-- 5.6 源码编辑 -->
+    <h3 id="detail-source">5.6 源码编辑模式</h3>
+
+    <h4>交互逻辑</h4>
+    <ol>
+      <li>工具栏新增「&lt;/&gt;」源码切换按钮</li>
+      <li>点击后画布区域切换为代码编辑器视图（左右分栏 或 全屏代码）</li>
+      <li>特性：
+        <ul>
+          <li>HTML / CSS / JS 语法高亮</li>
+          <li>源码修改实时反映到可视化预览（双向同步）</li>
+          <li>可使用 CodeMirror 或 Monaco Editor 方案</li>
+        </ul>
+      </li>
+      <li>再次点击切换按钮 → 回到可视化编辑模式</li>
+    </ol>
+  </section>
+
+  <!-- ===== 六、业务流程图 ===== -->
+  <section id="flowcharts">
+    <h2><span class="num">六、</span>业务流程图</h2>
+
+    <h3>6.1 总体操作主线</h3>
+    <div class="mermaid-wrap"><pre class="mermaid">
+flowchart TD
+  A["启动编辑器"] --> B{"首次使用?"}
+  B -- 是 --> C["显示空状态引导"]
+  B -- 否 --> D["恢复上次目录"]
+  C --> E["输入/拖入文件夹路径"]
+  D --> E
+  E --> F["列出 HTML 文件"]
+  F --> G["点击文件加载预览"]
+  G --> H["编辑循环"]
+  H --> I{"用户操作"}
+  I -- 修改文字 --> H
+  I -- 拖入组件 --> H
+  I -- 拖动对齐 --> H
+  I -- 删除元素 --> H
+  I -- 保存 --> J["备份+写入"]
+  J --> H
+  I -- 导出 --> K["PNG/PDF"]
+    </pre></div>
+
+    <h3>6.2 文件打开与项目管理</h3>
+    <div class="mermaid-wrap"><pre class="mermaid">
+flowchart TD
+  A["用户操作"] --> B{"操作类型"}
+  B -- 输入路径 --> C["loadDirectory"]
+  B -- 拖拽文件夹 --> D["提取路径"] --> C
+  B -- 最近文件 --> E["直接 openFile"]
+  B -- 自动恢复 --> F["localStorage"] --> C
+  C --> G{"API 返回"}
+  G -- 成功 --> H["渲染文件树"]
+  G -- 不存在 --> I["Toast 错误"]
+  G -- 空目录 --> J["空提示+返回按钮"]
+  H --> K["点击文件"]
+  K --> L{"未保存?"}
+  L -- 是 --> M["确认放弃?"]
+  L -- 否 --> N["加载预览"]
+  M -- 确定 --> N
+    </pre></div>
+
+    <h3>6.3 保存与备份</h3>
+    <div class="mermaid-wrap"><pre class="mermaid">
+flowchart TD
+  A["Ctrl+S"] --> B["提取干净 HTML"]
+  B --> C["POST /api/save"]
+  C --> D["备份原文件 .backup"]
+  D --> E["写入新内容"]
+  E --> F{"成功?"}
+  F -- 是 --> G["Toast 成功"]
+  F -- 否 --> H["Toast 失败"]
+    </pre></div>
+
+    <h3>6.4 批量导出 (P4)</h3>
+    <div class="mermaid-wrap"><pre class="mermaid">
+flowchart TD
+  A["点击导出"] --> B["弹出配置面板"]
+  B --> C{"范围"}
+  C -- 当前页 --> D["选当前"]
+  C -- 批量 --> E["勾选多页"]
+  D --> F{"格式"}
+  E --> F
+  F -- PNG --> G["Puppeteer 截图"]
+  F -- PDF --> H["生成 PDF"]
+  G --> I["下载/保存"]
+  H --> I
+    </pre></div>
+
+    <h3>6.5 源码模式切换 (P5)</h3>
+    <div class="mermaid-wrap"><pre class="mermaid">
+flowchart TD
+  A["点击源码按钮"] --> B{"当前模式"}
+  B -- 可视化 --> C["获取 HTML"]
+  C --> D["切换为代码编辑器"]
+  D --> E["语法高亮渲染"]
+  E --> F["编辑同步到预览"]
+  B -- 源码 --> G["读取代码"]
+  G --> H["写回 iframe"]
+  H --> I["切回可视化"]
+    </pre></div>
+  </section>
+
+  <!-- ===== 七、异常与边界处理 ===== -->
+  <section id="edge-cases">
+    <h2><span class="num">七、</span>异常与边界处理</h2>
+    <table>
+      <thead><tr><th>场景</th><th>处理方式</th></tr></thead>
+      <tbody>
+        <tr><td>画布未加载文件时拖入组件</td><td>Toast 提示「请先打开一个 HTML 文件」，阻止操作</td></tr>
+        <tr><td>拖拽组件到画布外释放</td><td>取消插入，无任何副作用</td></tr>
+        <tr><td>打开非 HTML 文件</td><td>文件列表中仅展示 .html/.htm 文件，不可选非 HTML</td></tr>
+        <tr><td>文件被外部修改</td><td>再次打开时以磁盘最新版本为准，提示「文件已更新」</td></tr>
+        <tr><td>保存失败（磁盘满/无权限）</td><td>Toast 错误提示 + 保留编辑内容在 iframe 中不丢失</td></tr>
+        <tr><td>目录不存在 / 路径错误</td><td>提示「目录不存在」+ 建议检查路径</td></tr>
+        <tr><td>空文件夹</td><td>显示「此目录下没有 HTML 文件」+ 保留「返回上级」按钮</td></tr>
+        <tr><td>超大 HTML 文件（>5MB）</td><td>正常加载但提示「大文件编辑可能较慢」</td></tr>
+        <tr><td>导出失败（Puppeteer 未安装）</td><td>提示安装依赖命令 <code>npm install</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ===== 八、未来演进规划 ===== -->
+  <section id="roadmap">
+    <h2><span class="num">八、</span>未来演进规划</h2>
+    <table>
+      <thead><tr><th>版本</th><th>阶段</th><th>核心功能</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="tag tag-p1">v1.0</span></td>
+          <td>核心编辑能力</td>
+          <td>组件面板 + 拖拽添加 + 智能对齐 + 文件浏览优化 + 多页面管理</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-p4">v1.1</span></td>
+          <td>交付能力</td>
+          <td>批量导出 PNG/PDF</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-p5">v1.2</span></td>
+          <td>进阶编辑</td>
+          <td>源码编辑模式（双向同步 + 语法高亮）</td>
+        </tr>
+        <tr>
+          <td>v2.0（远景）</td>
+          <td>协作与生态</td>
+          <td>组件模板市场、自定义组件、AI 辅助编辑、社区插件系统</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ===== 九、附件 ===== -->
+  <section id="appendix">
+    <h2><span class="num">九、</span>附件</h2>
+    <ul>
+      <li>📄 <a href="#">需求结构化复述文档</a>（requirements_summary.md）</li>
+      <li>📁 项目源码仓库（计划开源）</li>
+    </ul>
+    <div class="placeholder">
+      附件区域：可放置数据字典、竞品分析截图、技术调研文档等
+    </div>
+  </section>
+
+</div>
+
+</body>
+</html>
