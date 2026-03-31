@@ -121,9 +121,10 @@ app.get('/preview', (req, res) => {
   // 读取 HTML 内容
   let content = fs.readFileSync(resolved, 'utf-8');
 
-  // 注入 <base> 标签，让相对路径的资源能正确加载
+  // 注入 <base> 标签，将路径 base64 编码放入 URL 目录中，避免浏览器的相对路径解析丢弃查询参数
   const baseDir = path.dirname(resolved).replace(/\\/g, '/');
-  const baseTag = `<base href="/static/?base=${encodeURIComponent(baseDir)}/">`;
+  const base64Dir = Buffer.from(baseDir).toString('base64url');
+  const baseTag = `<base href="/static/${base64Dir}/">`;
 
   if (content.includes('<head>')) {
     content = content.replace('<head>', `<head>\n${baseTag}`);
@@ -138,24 +139,22 @@ app.get('/preview', (req, res) => {
 });
 
 // ===== 静态资源代理：让原型引用的 CSS/JS/图片 能正确加载 =====
-app.get('/static/', (req, res) => {
-  const base = req.query.base;
-  // 获取请求路径（去掉 /static/ 前缀和 query）
-  const requestUrl = req.originalUrl;
-  const staticPrefix = '/static/';
-  let relativePath = requestUrl.substring(requestUrl.indexOf(staticPrefix) + staticPrefix.length);
+app.get('/static/:b64/*', (req, res) => {
+  const b64 = req.params.b64;
+  const relativePath = req.params[0];
 
-  // 去掉 query string
-  const queryIdx = relativePath.indexOf('?');
-  if (queryIdx > 0) {
-    relativePath = relativePath.substring(0, queryIdx);
+  if (!b64) {
+    return res.status(400).send('缺少 base 路径');
   }
 
-  if (!base) {
-    return res.status(400).send('缺少 base 参数');
+  let baseDir;
+  try {
+    baseDir = Buffer.from(b64, 'base64url').toString('utf-8');
+  } catch (e) {
+    return res.status(400).send('解析 base 路径失败');
   }
 
-  const filePath = path.join(base, decodeURIComponent(relativePath));
+  const filePath = path.join(baseDir, decodeURIComponent(relativePath));
 
   if (!fs.existsSync(filePath)) {
     return res.status(404).send('资源不存在: ' + filePath);

@@ -81,6 +81,7 @@ body {
   font-size: 14px;
   background: linear-gradient(135deg, #6c5ce7, #a29bfe);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -362,7 +363,7 @@ body {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  overflow: auto;
+  overflow: hidden;
   background:
     radial-gradient(circle at 50% 50%, rgba(108, 92, 231, 0.03) 0%, transparent 70%),
     repeating-linear-gradient(0deg, transparent, transparent 19px, rgba(255,255,255,0.02) 19px, rgba(255,255,255,0.02) 20px),
@@ -373,9 +374,14 @@ body {
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 4px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05);
-  overflow: hidden;
+  overflow: visible;
   transition: width 0.3s ease, height 0.3s ease;
   position: relative;
+  flex-shrink: 0; /* 防止宽度被 Flex 容器截断压缩 */
+}
+
+.canvas-frame.resizing {
+  transition: none !important;
 }
 
 .canvas-frame iframe {
@@ -383,6 +389,28 @@ body {
   height: 100%;
   border: none;
   display: block;
+  border-radius: inherit;
+  background: #fff;
+}
+
+/* 画布边框调整手柄 */
+.canvas-resizer {
+  position: absolute;
+  z-index: 1000;
+  display: block;
+}
+.canvas-resizer-r { top: 0; right: -5px; bottom: 0; width: 10px; cursor: ew-resize; }
+.canvas-resizer-b { left: 0; bottom: -5px; right: 0; height: 10px; cursor: ns-resize; }
+.canvas-resizer-br { right: -6px; bottom: -6px; width: 14px; height: 14px; cursor: nwse-resize; }
+
+.canvas-resizer:hover::after, .canvas-resizer.active::after {
+  content: ''; position: absolute; background: var(--accent);
+}
+.canvas-resizer-r::after { top: 0; bottom: 0; left: 4px; width: 2px; }
+.canvas-resizer-b::after { left: 0; right: 0; top: 4px; height: 2px; }
+.canvas-resizer-br::after {
+  right: 4px; bottom: 4px; width: 6px; height: 6px; 
+  border-right: 2px solid var(--accent); border-bottom: 2px solid var(--accent); background: transparent;
 }
 
 /* 空状态 */
@@ -583,6 +611,345 @@ body {
 .drop-overlay.drag-over {
   background: rgba(108, 92, 231, 0.15);
 }
+
+/* ===== 图层面板 ===== */
+.layer-tree {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.layer-node {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: background var(--transition), color var(--transition);
+  white-space: nowrap;
+  border-left: 2px solid transparent;
+  min-height: 28px;
+}
+
+.layer-node:hover { background: var(--bg-hover); color: var(--text-primary); }
+.layer-node.active {
+  background: rgba(108, 92, 231, 0.12);
+  color: var(--accent);
+  border-left-color: var(--accent);
+}
+
+.layer-toggle {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: transform 0.15s;
+  border-radius: 3px;
+}
+.layer-toggle:hover { background: var(--bg-tertiary); }
+.layer-toggle.collapsed { transform: rotate(-90deg); }
+.layer-toggle.empty { visibility: hidden; }
+
+.layer-tag {
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+.layer-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.layer-children { overflow: hidden; }
+.layer-children.collapsed { display: none; }
+
+/* ===== 折叠式属性面板 ===== */
+.panel-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid var(--border-color);
+  transition: background var(--transition);
+}
+.panel-section-header:hover { background: var(--bg-hover); }
+
+.panel-section-header .section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+.panel-section-header .section-arrow {
+  font-size: 10px;
+  color: var(--text-muted);
+  transition: transform 0.2s;
+}
+.panel-section-header.collapsed .section-arrow { transform: rotate(-90deg); }
+
+.panel-section-body {
+  padding: 10px 16px 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+.panel-section-body.collapsed { display: none; }
+
+/* 对齐工具条 */
+.align-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.align-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: all var(--transition);
+}
+.align-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.align-btn.active { color: var(--accent); background: rgba(108,92,231,0.12); }
+
+.align-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border-color);
+  margin: 0 4px;
+}
+
+/* 数值拖拽输入框 */
+.panel-input.draggable-num {
+  cursor: ew-resize;
+}
+.panel-input.draggable-num:focus {
+  cursor: text;
+}
+
+/* WH 行内联排 */
+.wh-row {
+  display: grid;
+  grid-template-columns: auto 1fr 12px auto 1fr;
+  gap: 4px;
+  align-items: center;
+}
+.wh-row .panel-label { min-width: unset; font-size: 11px; }
+
+/* 颜色行改进 */
+.color-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.color-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+.color-swatch input[type="color"] {
+  opacity: 0;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  border: none;
+}
+
+.color-hex {
+  flex: 1;
+  height: 26px;
+  padding: 0 6px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-family: 'Consolas', monospace;
+  outline: none;
+}
+.color-hex:focus { border-color: var(--accent); }
+
+.color-opacity {
+  width: 44px;
+  height: 26px;
+  padding: 0 4px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 11px;
+  text-align: center;
+  outline: none;
+}
+
+/* 分段控制器 (用于文字对齐等) */
+.segmented-control {
+  display: flex;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  overflow: hidden;
+  flex: 1;
+}
+.seg-btn {
+  flex: 1;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all var(--transition);
+}
+.seg-btn:hover { color: var(--text-primary); }
+.seg-btn.active { background: var(--accent); color: #fff; }
+
+/* ===== 工具栏缩放控件 ===== */
+.toolbar-zoom {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+}
+.toolbar-zoom .zoom-value {
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-width: 40px;
+  text-align: center;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: all var(--transition);
+}
+.toolbar-zoom .zoom-value:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.zoom-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: all var(--transition);
+}
+.zoom-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* ===== 画布标尺 ===== */
+.ruler-corner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 24px;
+  height: 24px;
+  background: var(--bg-tertiary);
+  border-right: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  z-index: 20;
+}
+
+.ruler-h-wrap {
+  position: absolute;
+  top: 0;
+  left: 24px;
+  right: 0;
+  height: 24px;
+  overflow: hidden;
+  z-index: 15;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.ruler-v-wrap {
+  position: absolute;
+  top: 24px;
+  left: 0;
+  bottom: 0;
+  width: 24px;
+  overflow: hidden;
+  z-index: 15;
+  background: var(--bg-tertiary);
+  border-right: 1px solid var(--border-color);
+}
+
+.ruler-h-wrap canvas, .ruler-v-wrap canvas {
+  display: block;
+}
+
+.canvas-area.has-ruler .canvas-wrapper {
+  margin-top: 24px;
+  margin-left: 24px;
+}
+
+/* ===== 侧边栏三级 Tab 图标化 ===== */
+.sidebar-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.sidebar-tab {
+  flex: 1;
+  padding: 8px 0;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all var(--transition);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.sidebar-tab .tab-icon { font-size: 15px; }
+.sidebar-tab .tab-label { font-size: 10px; }
 </style>
 </head>
 <body>
@@ -624,6 +991,15 @@ body {
 
     <div class="toolbar-spacer"></div>
 
+    <!-- 缩放控件 (Phase 3) -->
+    <div class="toolbar-zoom">
+      <button class="zoom-btn" onclick="zoomOut()" title="缩小">−</button>
+      <span class="zoom-value" id="zoomDisplay" onclick="resetCanvasZoom()" title="点击重置 100%">100%</span>
+      <button class="zoom-btn" onclick="zoomIn()" title="放大">+</button>
+    </div>
+
+    <div class="toolbar-divider"></div>
+
     <div class="toolbar-group">
       <button class="tb-btn primary" id="btnSave" onclick="doSave()" disabled title="保存 (Ctrl+S)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
@@ -641,15 +1017,22 @@ body {
   <!-- ===== 主体 ===== -->
   <div class="main-body">
 
-    <!-- 左侧面板 (双 Tab) -->
+    <!-- 左侧面板 (三 Tab) -->
     <div class="sidebar" id="sidebar">
       <!-- Tab 切换 -->
       <div class="sidebar-tabs">
-        <button class="sidebar-tab active" onclick="switchSidebarTab('files')">📂 文件</button>
-        <button class="sidebar-tab" onclick="switchSidebarTab('components')">📦 组件</button>
+        <button class="sidebar-tab active" onclick="switchSidebarTab('files')">
+          <span class="tab-icon">📂</span><span class="tab-label">页面</span>
+        </button>
+        <button class="sidebar-tab" onclick="switchSidebarTab('layers')">
+          <span class="tab-icon">🧱</span><span class="tab-label">图层</span>
+        </button>
+        <button class="sidebar-tab" onclick="switchSidebarTab('components')">
+          <span class="tab-icon">📦</span><span class="tab-label">组件</span>
+        </button>
       </div>
 
-      <!-- Tab: 文件 -->
+      <!-- Tab: 页面 -->
       <div class="sidebar-panel active" id="panelFiles">
         <div class="dir-input-wrap">
           <div class="dir-input-row">
@@ -671,6 +1054,19 @@ body {
         </div>
       </div>
 
+      <!-- Tab: 图层 (Phase 1 新增) -->
+      <div class="sidebar-panel" id="panelLayers">
+        <div class="sidebar-header">
+          <h3>DOM 结构</h3>
+          <button class="tb-btn" onclick="refreshLayerTree()" title="刷新" style="height:24px;padding:0 6px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10"/></svg>
+          </button>
+        </div>
+        <div class="layer-tree" id="layerTree">
+          <div class="file-tree-empty">打开文件后<br>此处显示页面 DOM 结构</div>
+        </div>
+      </div>
+
       <!-- Tab: 组件 -->
       <div class="sidebar-panel" id="panelComponents">
         <div class="comp-search">
@@ -681,7 +1077,11 @@ body {
     </div>
 
     <!-- 中间画布 -->
-    <div class="canvas-area">
+    <div class="canvas-area has-ruler">
+      <!-- 标尺 (Phase 4) -->
+      <div class="ruler-corner"></div>
+      <div class="ruler-h-wrap"><canvas id="rulerH" height="24"></canvas></div>
+      <div class="ruler-v-wrap"><canvas id="rulerV" width="24"></canvas></div>
       <div class="canvas-wrapper" id="canvasWrapper">
         <div class="empty-state" id="emptyState">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
@@ -692,7 +1092,11 @@ body {
         </div>
         <div class="canvas-frame" id="canvasFrame" style="display:none; width:1200px; height:800px; position:relative;">
           <iframe id="previewFrame" sandbox="allow-same-origin allow-scripts"></iframe>
-          <div class="drop-overlay" id="dropOverlay"></div>
+          <div class="drop-overlay" id="dropOverlay" style="border-radius:inherit;"></div>
+          <!-- 画布宽度与高度拖出手柄 -->
+          <div class="canvas-resizer canvas-resizer-r" data-resize="r"></div>
+          <div class="canvas-resizer canvas-resizer-b" data-resize="b"></div>
+          <div class="canvas-resizer canvas-resizer-br" data-resize="br"></div>
         </div>
       </div>
       <div class="device-bar">
@@ -700,138 +1104,64 @@ body {
         <button class="device-btn" onclick="setDevice(this,768,1024)">📱 平板</button>
         <button class="device-btn" onclick="setDevice(this,375,812)">📲 手机</button>
         <button class="device-btn" onclick="setDevice(this,'100%','100%')">↔ 自适应</button>
+        <button class="device-btn" style="color:var(--accent);font-weight:600;" onclick="autoFitCanvas(this)">✨ 适应内容</button>
       </div>
     </div>
 
-    <!-- 右侧属性面板 -->
+    <!-- 右侧属性面板 (Phase 2 重构) -->
     <div class="panel" id="panel">
       <div class="panel-empty" id="panelEmpty">
         <p>🎯 点击画布中的元素<br>即可在此编辑属性</p>
       </div>
       <div id="panelContent" style="display:none;">
 
-        <!-- 元素信息 -->
-        <div class="panel-section">
-          <div class="panel-section-title">元素信息</div>
-          <div class="panel-row">
-            <span class="panel-label">标签</span>
-            <input class="panel-input" id="propTag" readonly />
+        <!-- 元素信息头 -->
+        <div class="panel-section" style="padding:10px 16px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="layer-tag" id="propTag" style="font-size:11px;padding:2px 8px;"></span>
+            <span style="font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;" id="propId"></span>
           </div>
-          <div class="panel-row">
-            <span class="panel-label">ID</span>
-            <input class="panel-input" id="propId" readonly />
-          </div>
-          <div class="panel-row">
-            <span class="panel-label">Class</span>
-            <input class="panel-input" id="propClass" readonly />
-          </div>
+          <div style="margin-top:4px;font-size:10px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;" id="propClass"></div>
         </div>
 
-        <!-- 文字内容 -->
-        <div class="panel-section">
-          <div class="panel-section-title">文字内容</div>
-          <textarea class="panel-textarea" id="propText" placeholder="双击画布元素也可直接编辑"></textarea>
+        <!-- 对齐工具条 -->
+        <div class="align-toolbar">
+          <button class="align-btn" onclick="applyAlign('left')" title="左对齐">⫷</button>
+          <button class="align-btn" onclick="applyAlign('center')" title="居中">⫿</button>
+          <button class="align-btn" onclick="applyAlign('right')" title="右对齐">⫸</button>
+          <div class="align-divider"></div>
+          <button class="align-btn" onclick="applyStyle('display','flex')" title="Flex 布局">⊞</button>
+          <button class="align-btn" onclick="applyStyle('display','block')" title="Block">☐</button>
         </div>
 
-        <!-- 排版 -->
-        <div class="panel-section">
-          <div class="panel-section-title">排版</div>
-          <div class="panel-row">
-            <span class="panel-label">字号</span>
-            <input class="panel-input" id="propFontSize" type="number" min="0" step="1" placeholder="16" />
-            <span style="color:var(--text-muted);font-size:12px">px</span>
-          </div>
-          <div class="panel-row">
-            <span class="panel-label">行高</span>
-            <input class="panel-input" id="propLineHeight" type="text" placeholder="1.5" />
-          </div>
-          <div class="panel-row">
-            <span class="panel-label">字重</span>
-            <select class="panel-select" id="propFontWeight">
-              <option value="">-</option>
-              <option value="normal">Normal (400)</option>
-              <option value="500">Medium (500)</option>
-              <option value="600">Semi Bold (600)</option>
-              <option value="bold">Bold (700)</option>
-            </select>
-          </div>
-          <div class="panel-row">
-            <span class="panel-label">对齐</span>
-            <select class="panel-select" id="propTextAlign">
-              <option value="">-</option>
-              <option value="left">左对齐</option>
-              <option value="center">居中</option>
-              <option value="right">右对齐</option>
-            </select>
-          </div>
+        <!-- 📐 布局/尺寸 -->
+        <div class="panel-section-header" onclick="toggleSection(this)">
+          <span class="section-title">📐 布局 · 尺寸</span>
+          <span class="section-arrow">▼</span>
         </div>
-
-        <!-- 颜色 -->
-        <div class="panel-section">
-          <div class="panel-section-title">颜色</div>
-          <div class="panel-row">
-            <span class="panel-label">文字</span>
-            <input type="color" class="panel-color-input" id="propColor" />
-            <input class="panel-input" id="propColorText" placeholder="#000000" />
+        <div class="panel-section-body">
+          <div class="wh-row" style="margin-bottom:8px;">
+            <span class="panel-label">W</span>
+            <input class="panel-input" id="propWidth" type="text" placeholder="auto" />
+            <span style="color:var(--text-muted);font-size:10px;">×</span>
+            <span class="panel-label">H</span>
+            <input class="panel-input" id="propHeight" type="text" placeholder="auto" />
           </div>
-          <div class="panel-row">
-            <span class="panel-label">背景</span>
-            <input type="color" class="panel-color-input" id="propBgColor" />
-            <input class="panel-input" id="propBgColorText" placeholder="transparent" />
-          </div>
-        </div>
-
-        <!-- 间距 -->
-        <div class="panel-section">
-          <div class="panel-section-title">外边距 (Margin)</div>
+          <div style="font-size:10px;color:var(--text-muted);margin:8px 0 4px;">外边距 (Margin)</div>
           <div class="spacing-grid">
             <input class="panel-input" id="propMarginTop" type="number" placeholder="上" data-prop="marginTop" />
             <input class="panel-input" id="propMarginRight" type="number" placeholder="右" data-prop="marginRight" />
             <input class="panel-input" id="propMarginBottom" type="number" placeholder="下" data-prop="marginBottom" />
             <input class="panel-input" id="propMarginLeft" type="number" placeholder="左" data-prop="marginLeft" />
           </div>
-        </div>
-
-        <div class="panel-section">
-          <div class="panel-section-title">内边距 (Padding)</div>
+          <div style="font-size:10px;color:var(--text-muted);margin:8px 0 4px;">内边距 (Padding)</div>
           <div class="spacing-grid">
             <input class="panel-input" id="propPaddingTop" type="number" placeholder="上" data-prop="paddingTop" />
             <input class="panel-input" id="propPaddingRight" type="number" placeholder="右" data-prop="paddingRight" />
             <input class="panel-input" id="propPaddingBottom" type="number" placeholder="下" data-prop="paddingBottom" />
             <input class="panel-input" id="propPaddingLeft" type="number" placeholder="左" data-prop="paddingLeft" />
           </div>
-        </div>
-
-        <!-- 尺寸 -->
-        <div class="panel-section">
-          <div class="panel-section-title">尺寸</div>
-          <div class="panel-row">
-            <span class="panel-label">宽度</span>
-            <input class="panel-input" id="propWidth" type="text" placeholder="auto" />
-          </div>
-          <div class="panel-row">
-            <span class="panel-label">高度</span>
-            <input class="panel-input" id="propHeight" type="text" placeholder="auto" />
-          </div>
-        </div>
-
-        <!-- 边框 -->
-        <div class="panel-section">
-          <div class="panel-section-title">边框</div>
-          <div class="panel-row">
-            <span class="panel-label">圆角</span>
-            <input class="panel-input" id="propBorderRadius" type="text" placeholder="0px" />
-          </div>
-          <div class="panel-row">
-            <span class="panel-label">边框</span>
-            <input class="panel-input" id="propBorder" type="text" placeholder="none" />
-          </div>
-        </div>
-
-        <!-- 显示 -->
-        <div class="panel-section">
-          <div class="panel-section-title">显示与可见</div>
-          <div class="panel-row">
+          <div class="panel-row" style="margin-top:8px;">
             <span class="panel-label">display</span>
             <select class="panel-select" id="propDisplay">
               <option value="">-</option>
@@ -843,25 +1173,104 @@ body {
               <option value="none">none (隐藏)</option>
             </select>
           </div>
+        </div>
+
+        <!-- 🎨 外观 -->
+        <div class="panel-section-header" onclick="toggleSection(this)">
+          <span class="section-title">🎨 外观</span>
+          <span class="section-arrow">▼</span>
+        </div>
+        <div class="panel-section-body">
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:6px;">填充 (背景)</div>
+          <div class="color-row" style="margin-bottom:8px;">
+            <div class="color-swatch" id="bgSwatch" style="background:#ffffff;">
+              <input type="color" id="propBgColor" />
+            </div>
+            <input class="color-hex" id="propBgColorText" placeholder="transparent" />
+            <input class="color-opacity" id="propBgOpacity" type="text" value="100%" />
+          </div>
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:6px;">描边 (边框)</div>
           <div class="panel-row">
-            <span class="panel-label">opacity</span>
-            <input class="panel-input" id="propOpacity" type="number" min="0" max="1" step="0.1" placeholder="1" />
+            <input class="panel-input" id="propBorder" type="text" placeholder="none" style="flex:1;" />
+          </div>
+          <div class="panel-row" style="margin-top:6px;">
+            <span class="panel-label">圆角</span>
+            <input class="panel-input" id="propBorderRadius" type="text" placeholder="0px" />
+          </div>
+          <div class="panel-row" style="margin-top:6px;">
+            <span class="panel-label">不透明</span>
+            <input class="panel-input" id="propOpacity" type="number" min="0" max="1" step="0.1" placeholder="1" style="width:60px;" />
           </div>
         </div>
 
-        <!-- 页面跳转配置 -->
-        <div class="panel-section" id="linkSection" style="display:none;">
-          <div class="panel-title">🔗 页面跳转</div>
+        <!-- ✏️ 文本 -->
+        <div class="panel-section-header" onclick="toggleSection(this)">
+          <span class="section-title">✏️ 文本</span>
+          <span class="section-arrow">▼</span>
+        </div>
+        <div class="panel-section-body">
+          <div class="color-row" style="margin-bottom:8px;">
+            <div class="color-swatch" id="textSwatch" style="background:#000000;">
+              <input type="color" id="propColor" />
+            </div>
+            <input class="color-hex" id="propColorText" placeholder="#000000" />
+          </div>
           <div class="panel-row">
-            <span class="panel-label">链接到</span>
-            <select class="panel-select" id="propPageLink" onchange="setPageLink(this.value)">
-              <option value="">-- 不设置 --</option>
+            <span class="panel-label">字号</span>
+            <input class="panel-input" id="propFontSize" type="number" min="0" step="1" placeholder="16" style="width:60px;" />
+            <span style="color:var(--text-muted);font-size:11px">px</span>
+          </div>
+          <div class="panel-row">
+            <span class="panel-label">字重</span>
+            <select class="panel-select" id="propFontWeight">
+              <option value="">-</option>
+              <option value="normal">Normal</option>
+              <option value="500">Medium</option>
+              <option value="600">Semi Bold</option>
+              <option value="bold">Bold</option>
             </select>
+          </div>
+          <div class="panel-row">
+            <span class="panel-label">行高</span>
+            <input class="panel-input" id="propLineHeight" type="text" placeholder="1.5" />
+          </div>
+          <div class="panel-row">
+            <span class="panel-label">对齐</span>
+            <div class="segmented-control" id="propTextAlign">
+              <button class="seg-btn" data-val="left" onclick="setTextAlign('left',this)" title="左对齐">≡</button>
+              <button class="seg-btn" data-val="center" onclick="setTextAlign('center',this)" title="居中">≡</button>
+              <button class="seg-btn" data-val="right" onclick="setTextAlign('right',this)" title="右对齐">≡</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 📝 内容 -->
+        <div class="panel-section-header" onclick="toggleSection(this)">
+          <span class="section-title">📝 内容</span>
+          <span class="section-arrow">▼</span>
+        </div>
+        <div class="panel-section-body">
+          <textarea class="panel-textarea" id="propText" placeholder="双击画布元素也可直接编辑"></textarea>
+        </div>
+
+        <!-- 🔗 页面跳转配置 -->
+        <div id="linkSection" style="display:none;">
+          <div class="panel-section-header" onclick="toggleSection(this)">
+            <span class="section-title">🔗 页面跳转</span>
+            <span class="section-arrow">▼</span>
+          </div>
+          <div class="panel-section-body">
+            <div class="panel-row">
+              <span class="panel-label">链接到</span>
+              <select class="panel-select" id="propPageLink" onchange="setPageLink(this.value)">
+                <option value="">-- 不设置 --</option>
+              </select>
+            </div>
           </div>
         </div>
 
         <!-- 操作按钮 -->
-        <div class="panel-section" style="border-bottom:none;">
+        <div style="padding:12px 16px;">
           <button class="tb-btn" onclick="deleteSelected()" style="width:100%;justify-content:center;color:var(--danger);border:1px solid var(--danger);border-radius:6px;">
             🗑️ 删除元素
           </button>
@@ -1112,6 +1521,25 @@ function setupIframeInteraction() {
     selectElement(el);
     startInlineEdit(el);
   }, true);
+
+  // 画布缩放支持 (Ctrl + 滚轮) - 捕获 iframe 内的事件并透传给父层
+  doc.addEventListener('wheel', (e) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      if (window.parent && window.parent.handleCanvasZoom) {
+        window.parent.handleCanvasZoom(e.deltaY);
+      }
+    }
+  }, { passive: false });
+
+  doc.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && (e.key === '0' || e.key === 'NumPad0')) {
+      e.preventDefault();
+      if (window.parent && window.parent.resetCanvasZoom) {
+        window.parent.resetCanvasZoom();
+      }
+    }
+  });
 
   // 拖拽逻辑（含智能对齐辅助线）
   let dragEl = null, dragStartX, dragStartY, origLeft, origTop, origPosition;
@@ -1442,9 +1870,10 @@ function updatePanel() {
 
   const cs = el.ownerDocument.defaultView.getComputedStyle(el);
 
-  $('propTag').value = el.tagName.toLowerCase();
-  $('propId').value = el.id || '';
-  $('propClass').value = el.className.replace(/__editor-\w+/g, '').trim();
+  // 元素信息头 (现在是 span 而非 input)
+  $('propTag').textContent = el.tagName.toLowerCase();
+  $('propId').textContent = el.id ? '#' + el.id : '';
+  $('propClass').textContent = el.className.replace(/__editor-\w+/g, '').trim() || '';
 
   // 文字:只取直接文本子节点
   const directText = Array.from(el.childNodes)
@@ -1456,12 +1885,20 @@ function updatePanel() {
   $('propFontSize').value = parseInt(cs.fontSize) || '';
   $('propLineHeight').value = cs.lineHeight === 'normal' ? '' : cs.lineHeight;
   $('propFontWeight').value = fontWeightToValue(cs.fontWeight);
-  $('propTextAlign').value = cs.textAlign || '';
+
+  // 分段控制器更新
+  updateTextAlignSegments(cs.textAlign);
 
   $('propColor').value = rgbToHex(cs.color);
   $('propColorText').value = rgbToHex(cs.color);
-  $('propBgColor').value = cs.backgroundColor === 'rgba(0, 0, 0, 0)' ? '#ffffff' : rgbToHex(cs.backgroundColor);
-  $('propBgColorText').value = cs.backgroundColor === 'rgba(0, 0, 0, 0)' ? 'transparent' : rgbToHex(cs.backgroundColor);
+  const textSwatch = $('textSwatch');
+  if (textSwatch) textSwatch.style.background = rgbToHex(cs.color);
+
+  const bgHex = cs.backgroundColor === 'rgba(0, 0, 0, 0)' ? '#ffffff' : rgbToHex(cs.backgroundColor);
+  $('propBgColor').value = bgHex;
+  $('propBgColorText').value = cs.backgroundColor === 'rgba(0, 0, 0, 0)' ? 'transparent' : bgHex;
+  const bgSwatch = $('bgSwatch');
+  if (bgSwatch) bgSwatch.style.background = bgHex;
 
   $('propMarginTop').value = parseInt(cs.marginTop) || 0;
   $('propMarginRight').value = parseInt(cs.marginRight) || 0;
@@ -1505,11 +1942,13 @@ function bindPanelEvents() {
   $('propFontSize').addEventListener('input', () => applyStyle('fontSize', $('propFontSize').value + 'px'));
   $('propLineHeight').addEventListener('input', () => applyStyle('lineHeight', $('propLineHeight').value));
   $('propFontWeight').addEventListener('change', () => applyStyle('fontWeight', $('propFontWeight').value));
-  $('propTextAlign').addEventListener('change', () => applyStyle('textAlign', $('propTextAlign').value));
+  // textAlign 由 segmented control 处理，无需 addEventListener
 
   // 颜色
   $('propColor').addEventListener('input', () => {
     $('propColorText').value = $('propColor').value;
+    const ts = $('textSwatch');
+    if (ts) ts.style.background = $('propColor').value;
     applyStyle('color', $('propColor').value);
   });
   $('propColorText').addEventListener('change', () => {
@@ -1518,9 +1957,13 @@ function bindPanelEvents() {
   });
   $('propBgColor').addEventListener('input', () => {
     $('propBgColorText').value = $('propBgColor').value;
+    const bs = $('bgSwatch');
+    if (bs) bs.style.background = $('propBgColor').value;
     applyStyle('backgroundColor', $('propBgColor').value);
   });
   $('propBgColorText').addEventListener('change', () => {
+    const bs = $('bgSwatch');
+    if (bs) bs.style.background = $('propBgColorText').value;
     applyStyle('backgroundColor', $('propBgColorText').value);
   });
 
@@ -1667,7 +2110,7 @@ function markDirty() {
 }
 
 // ===================================================================
-//  设备预览切换
+//  设备预览切换 & 适应内容
 // ===================================================================
 function setDevice(btn, w, h) {
   document.querySelectorAll('.device-btn').forEach(b => b.classList.remove('active'));
@@ -1683,6 +2126,33 @@ function setDevice(btn, w, h) {
     frame.style.height = h + 'px';
     frame.style.borderRadius = '8px';
   }
+  
+  // 切换设备后，也重置平移和缩放，使其居中
+  resetCanvasZoom();
+}
+
+function autoFitCanvas(btn) {
+  if (btn) {
+    document.querySelectorAll('.device-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+
+  const iframe = $('previewFrame');
+  const doc = iframe.contentDocument;
+  if (!doc || !doc.body) return;
+
+  const frame = $('canvasFrame');
+  
+  // 测量内容真实滚动宽高
+  const w = Math.max(doc.body.scrollWidth, doc.documentElement.scrollWidth, doc.body.offsetWidth);
+  const h = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight, doc.body.offsetHeight);
+  
+  // 设置为实际内容宽高即可消除内部滚动条，看全整个页面
+  frame.style.width = w + 'px';
+  frame.style.height = h + 'px';
+  frame.style.borderRadius = '8px';
+  
+  showToast(`已适应页面真实内容大小: ${w} × ${h}`, 'success');
 }
 
 // ===================================================================
@@ -1717,15 +2187,228 @@ function fontWeightToValue(fw) {
 }
 
 // ===================================================================
-//  快捷键
+//  快捷键、画布缩放与无限画布平移
 // ===================================================================
+let canvasZoom = 1;
+let panX = 0;
+let panY = 0;
+
+function updateCanvasTransform() {
+  const frame = $('canvasFrame');
+  // 平移和缩放组合，中心点(transformOrigin)设置为正中，以防缩放时跳变
+  frame.style.transform = `translate(${panX}px, ${panY}px) scale(${canvasZoom})`;
+  frame.style.transformOrigin = 'center center';
+  
+  // 让背景图跟着稍微偏移，产生无限画布视觉错觉
+  $('canvasWrapper').style.backgroundPosition = `${panX}px ${panY}px`;
+}
+
+function handleCanvasZoom(deltaY, clientX, clientY) {
+  const wrapper = $('canvasWrapper');
+  const rect = wrapper.getBoundingClientRect();
+  
+  // 如果没有传入 clientX/Y (如 iframe 内部事件透传)，则默认以画布中心缩放
+  let mouseX = 0;
+  let mouseY = 0;
+  
+  if (clientX !== undefined && clientY !== undefined) {
+    mouseX = clientX - rect.left - rect.width / 2;
+    mouseY = clientY - rect.top - rect.height / 2;
+  }
+
+  // 根据滚动量平滑计算缩放倍率
+  const zoomFactor = Math.exp(-deltaY * 0.0015);
+  const newZoom = Math.max(0.1, Math.min(10.0, canvasZoom * zoomFactor));
+  
+  // 始终保持鼠标指向的内容位置不变计算新平移量
+  const scaleRatio = newZoom / canvasZoom;
+  panX = mouseX - (mouseX - panX) * scaleRatio;
+  panY = mouseY - (mouseY - panY) * scaleRatio;
+  
+  canvasZoom = newZoom;
+  updateCanvasTransform();
+  showZoomIndicator();
+}
+
+function showZoomIndicator() {
+  // 更新工具栏常驻缩放显示
+  const zd = $('zoomDisplay');
+  if (zd) zd.textContent = Math.round(canvasZoom * 100) + '%';
+  
+  // 画布标尺同步更新
+  drawRulers();
+}
+
+function resetCanvasZoom() {
+  canvasZoom = 1;
+  panX = 0;
+  panY = 0;
+  updateCanvasTransform();
+  showZoomIndicator();
+}
+
+function zoomIn() {
+  handleCanvasZoom(-200);
+}
+
+function zoomOut() {
+  handleCanvasZoom(200);
+}
+
+// 监听外层 Wrapper 的滚轮事件
+$('canvasWrapper').addEventListener('wheel', (e) => {
+  e.preventDefault(); // 禁用原生滚动
+  if (e.ctrlKey || e.metaKey) {
+    handleCanvasZoom(e.deltaY, e.clientX, e.clientY);
+  } else {
+    // 没按 Ctrl，作为普通的画布平移 (支持双指滑动 / 普通鼠标滚轮)
+    panX -= e.deltaX;
+    panY -= e.deltaY;
+    updateCanvasTransform();
+  }
+}, { passive: false });
+
+// 鼠标中键 / 空格键拖拽画布
+let isPanDragging = false;
+let isSpaceDown = false;
+let dragStartX = 0;
+let dragStartY = 0;
+
 document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && !e.target.isContentEditable) {
+    isSpaceDown = true;
+    $('canvasWrapper').style.cursor = 'grab';
+    e.preventDefault(); // 防止页面跳动
+  }
+  
   if (e.ctrlKey && e.key === 's') { e.preventDefault(); doSave(); }
   if (e.ctrlKey && e.key === 'z') { e.preventDefault(); doUndo(); }
   if (e.ctrlKey && e.key === 'y') { e.preventDefault(); doRedo(); }
+  if (e.ctrlKey && (e.key === '0' || e.key === 'NumPad0')) { e.preventDefault(); resetCanvasZoom(); }
   if (e.key === 'Delete' && selectedElement) { deleteSelected(); }
   if (e.key === 'Escape') { clearSelection(); }
 });
+
+document.addEventListener('keyup', (e) => {
+  if (e.code === 'Space') {
+    isSpaceDown = false;
+    $('canvasWrapper').style.cursor = '';
+  }
+});
+
+$('canvasWrapper').addEventListener('mousedown', (e) => {
+  // 鼠标中键 (1) 或者是空格 + 任意点击
+  if (e.button === 1 || isSpaceDown) {
+    isPanDragging = true;
+    dragStartX = e.clientX - panX;
+    dragStartY = e.clientY - panY;
+    $('canvasWrapper').style.cursor = 'grabbing';
+    e.preventDefault();
+  }
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (isPanDragging) {
+    panX = e.clientX - dragStartX;
+    panY = e.clientY - dragStartY;
+    updateCanvasTransform();
+  }
+});
+
+window.addEventListener('mouseup', (e) => {
+  if (isPanDragging) {
+    isPanDragging = false;
+    $('canvasWrapper').style.cursor = isSpaceDown ? 'grab' : '';
+  }
+});
+
+// ===================================================================
+//  拖拽改变画布尺寸
+// ===================================================================
+function setupCanvasResizer() {
+  const frame = $('canvasFrame');
+  if (!frame) return;
+  
+  let isResizing = false;
+  let resizeDir = '';
+  let startX = 0;
+  let startY = 0;
+  let startW = 0;
+  let startH = 0;
+  let startPanX = 0;
+  let startPanY = 0;
+  
+  frame.addEventListener('mousedown', (e) => {
+    if (e.target.classList.contains('canvas-resizer')) {
+      isResizing = true;
+      resizeDir = e.target.getAttribute('data-resize');
+      startX = e.clientX;
+      startY = e.clientY;
+      startW = frame.offsetWidth;
+      startH = frame.offsetHeight;
+      startPanX = panX;
+      startPanY = panY;
+      
+      frame.classList.add('resizing');
+      e.target.classList.add('active');
+      
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
+  
+  window.addEventListener('mousemove', (e) => {
+    if (isResizing) {
+      // 变化量需考虑缩放系数
+      const dx = (e.clientX - startX) / canvasZoom;
+      const dy = (e.clientY - startY) / canvasZoom;
+      
+      let newW = startW;
+      let newH = startH;
+      let diffW = 0;
+      let diffH = 0;
+      
+      if (resizeDir.includes('r')) {
+        newW = Math.max(320, startW + dx);
+        diffW = newW - startW;
+        frame.style.width = newW + 'px';
+      }
+      if (resizeDir.includes('b')) {
+        newH = Math.max(320, startH + dy);
+        diffH = newH - startH;
+        frame.style.height = newH + 'px';
+      }
+      
+      // 因为 wrapper 是居中布局，调整长宽时中心点会移动，
+      // 我们需要反向平移让“左上角”视觉上固定，以防鼠标和边框产生脱节偏移。
+      // width 增加了 diffW，由于是向两边生长，右侧实际只移动了 diffW/2。
+      // 我们补强平移 panX 增加 (diffW/2) * zoom，就能让右侧直接随鼠标移动完成 100% 拖拽跨度。
+      panX = startPanX + (diffW / 2) * canvasZoom;
+      panY = startPanY + (diffH / 2) * canvasZoom;
+      updateCanvasTransform();
+      
+      // 更新拖拽尺寸提示
+      let indicator = $('zoomIndicator');
+      if (indicator) {
+        indicator.textContent = `画布尺寸: ${Math.round(newW)} × ${Math.round(newH)}`;
+        indicator.style.opacity = '1';
+        clearTimeout(indicator.timer);
+        indicator.timer = setTimeout(() => { indicator.style.opacity = '0'; }, 1000);
+      }
+      
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
+  
+  window.addEventListener('mouseup', (e) => {
+    if (isResizing) {
+      isResizing = false;
+      frame.classList.remove('resizing');
+      frame.querySelectorAll('.canvas-resizer').forEach(el => el.classList.remove('active'));
+    }
+  });
+}
 
 // ===================================================================
 //  最近文件管理
@@ -1761,11 +2444,16 @@ function clearRecentFiles() {
 //  侧边栏 Tab 切换
 // ===================================================================
 function switchSidebarTab(tabName) {
+  const tabs = ['files', 'layers', 'components'];
+  const panels = ['panelFiles', 'panelLayers', 'panelComponents'];
   document.querySelectorAll('.sidebar-tab').forEach((btn, i) => {
-    btn.classList.toggle('active', (i === 0 && tabName === 'files') || (i === 1 && tabName === 'components'));
+    btn.classList.toggle('active', tabs[i] === tabName);
   });
-  $('panelFiles').classList.toggle('active', tabName === 'files');
-  $('panelComponents').classList.toggle('active', tabName === 'components');
+  panels.forEach((id, i) => {
+    $(id).classList.toggle('active', tabs[i] === tabName);
+  });
+  // 自动刷新图层树
+  if (tabName === 'layers') refreshLayerTree();
 }
 
 // ===================================================================
@@ -1965,6 +2653,8 @@ bindPanelEvents();
 renderRecentFiles();
 renderComponentPanel();
 setupCanvasDrop();
+setupCanvasResizer();
+initRulers();
 
 // 自动恢复上次目录
 (function restoreLastDir() {
@@ -1974,6 +2664,232 @@ setupCanvasDrop();
     loadDirectory(lastDir);
   }
 })();
+
+// ===================================================================
+//  Phase 1: 图层树 (Layer Tree)
+// ===================================================================
+function refreshLayerTree() {
+  const iframe = $('previewFrame');
+  const doc = iframe?.contentDocument;
+  const tree = $('layerTree');
+  if (!doc || !doc.body) {
+    tree.innerHTML = '<div class="file-tree-empty">打开文件后<br>此处显示页面 DOM 结构</div>';
+    return;
+  }
+  tree.innerHTML = '';
+  buildLayerNodes(doc.body, tree, 0);
+}
+
+function buildLayerNodes(parentEl, container, depth) {
+  const children = Array.from(parentEl.children).filter(el => {
+    const cn = el.className || '';
+    return !cn.toString().includes('__editor-') && el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE' && el.id !== '__editor_style__';
+  });
+
+  children.forEach(el => {
+    const hasChildren = Array.from(el.children).filter(c => {
+      const cn = c.className || '';
+      return !cn.toString().includes('__editor-') && c.tagName !== 'SCRIPT' && c.tagName !== 'STYLE';
+    }).length > 0;
+
+    // 节点行
+    const nodeDiv = document.createElement('div');
+    nodeDiv.className = 'layer-node';
+    nodeDiv.style.paddingLeft = (8 + depth * 16) + 'px';
+    if (el === selectedElement) nodeDiv.classList.add('active');
+
+    // 展开/折叠图标
+    const toggle = document.createElement('span');
+    toggle.className = 'layer-toggle' + (hasChildren ? '' : ' empty');
+    toggle.textContent = '▼';
+    nodeDiv.appendChild(toggle);
+
+    // 标签名
+    const tag = document.createElement('span');
+    tag.className = 'layer-tag';
+    tag.textContent = el.tagName.toLowerCase();
+    nodeDiv.appendChild(tag);
+
+    // 标签描述 (id/class/text snippet)
+    const label = document.createElement('span');
+    label.className = 'layer-label';
+    let desc = '';
+    if (el.id) desc = '#' + el.id;
+    else if (el.className && typeof el.className === 'string') desc = '.' + el.className.replace(/__editor-\w+/g,'').trim().split(/\s+/)[0];
+    else {
+      const txt = el.textContent?.trim();
+      if (txt) desc = txt.substring(0, 20) + (txt.length > 20 ? '…' : '');
+    }
+    label.textContent = desc;
+    nodeDiv.appendChild(label);
+
+    container.appendChild(nodeDiv);
+
+    // 子容器
+    const childrenDiv = document.createElement('div');
+    childrenDiv.className = 'layer-children';
+    container.appendChild(childrenDiv);
+
+    // 点击选中
+    nodeDiv.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selectElement(el);
+      // 高亮当前图层节点
+      document.querySelectorAll('.layer-node').forEach(n => n.classList.remove('active'));
+      nodeDiv.classList.add('active');
+    });
+
+    // 展开/折叠
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggle.classList.toggle('collapsed');
+      childrenDiv.classList.toggle('collapsed');
+    });
+
+    // 递归子节点
+    if (hasChildren) {
+      buildLayerNodes(el, childrenDiv, depth + 1);
+    }
+  });
+}
+
+// ===================================================================
+//  Phase 2: 折叠面板 & 分段控制器
+// ===================================================================
+function toggleSection(header) {
+  header.classList.toggle('collapsed');
+  const body = header.nextElementSibling;
+  if (body) body.classList.toggle('collapsed');
+}
+
+function setTextAlign(value, btn) {
+  applyStyle('textAlign', value);
+  // 更新分段控制器 active 状态
+  const parent = btn.parentElement;
+  parent.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function updateTextAlignSegments(align) {
+  const container = $('propTextAlign');
+  if (!container) return;
+  container.querySelectorAll('.seg-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.val === align);
+  });
+}
+
+function applyAlign(direction) {
+  applyStyle('textAlign', direction);
+  updateTextAlignSegments(direction);
+}
+
+// ===================================================================
+//  Phase 4: 画布标尺
+// ===================================================================
+function initRulers() {
+  const hWrap = document.querySelector('.ruler-h-wrap');
+  const vWrap = document.querySelector('.ruler-v-wrap');
+  if (!hWrap || !vWrap) return;
+
+  const ro = new ResizeObserver(() => drawRulers());
+  ro.observe(hWrap);
+  ro.observe(vWrap);
+}
+
+function drawRulers() {
+  drawHorizontalRuler();
+  drawVerticalRuler();
+}
+
+function drawHorizontalRuler() {
+  const canvas = $('rulerH');
+  const wrap = document.querySelector('.ruler-h-wrap');
+  if (!canvas || !wrap) return;
+  const w = wrap.clientWidth;
+  canvas.width = w;
+  canvas.height = 24;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, w, 24);
+
+  const step = getRulerStep(canvasZoom);
+  const offset = panX * 1 + w / 2; // centered layout offset
+
+  ctx.fillStyle = '#6b7280';
+  ctx.font = '9px Inter, sans-serif';
+  ctx.textAlign = 'center';
+
+  const startVal = Math.floor((-offset) / (step * canvasZoom)) * step;
+  const endVal = Math.ceil((w - offset) / (step * canvasZoom)) * step;
+
+  for (let val = startVal; val <= endVal; val += step) {
+    const x = offset + val * canvasZoom;
+    if (x < -10 || x > w + 10) continue;
+
+    const isMajor = val % (step * 5) === 0;
+    ctx.strokeStyle = isMajor ? '#9aa0b4' : '#4a4f63';
+    ctx.beginPath();
+    ctx.moveTo(x, isMajor ? 10 : 16);
+    ctx.lineTo(x, 24);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    if (isMajor) {
+      ctx.fillText(val, x, 9);
+    }
+  }
+}
+
+function drawVerticalRuler() {
+  const canvas = $('rulerV');
+  const wrap = document.querySelector('.ruler-v-wrap');
+  if (!canvas || !wrap) return;
+  const h = wrap.clientHeight;
+  canvas.width = 24;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, 24, h);
+
+  const step = getRulerStep(canvasZoom);
+  const offset = panY * 1 + h / 2;
+
+  ctx.fillStyle = '#6b7280';
+  ctx.font = '9px Inter, sans-serif';
+  ctx.textAlign = 'right';
+
+  const startVal = Math.floor((-offset) / (step * canvasZoom)) * step;
+  const endVal = Math.ceil((h - offset) / (step * canvasZoom)) * step;
+
+  for (let val = startVal; val <= endVal; val += step) {
+    const y = offset + val * canvasZoom;
+    if (y < -10 || y > h + 10) continue;
+
+    const isMajor = val % (step * 5) === 0;
+    ctx.strokeStyle = isMajor ? '#9aa0b4' : '#4a4f63';
+    ctx.beginPath();
+    ctx.moveTo(isMajor ? 10 : 16, y);
+    ctx.lineTo(24, y);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    if (isMajor) {
+      ctx.save();
+      ctx.translate(9, y - 3);
+      ctx.rotate(-Math.PI / 2);
+      ctx.textAlign = 'center';
+      ctx.fillText(val, 0, 0);
+      ctx.restore();
+    }
+  }
+}
+
+function getRulerStep(zoom) {
+  if (zoom >= 4) return 5;
+  if (zoom >= 2) return 10;
+  if (zoom >= 1) return 20;
+  if (zoom >= 0.5) return 50;
+  if (zoom >= 0.25) return 100;
+  return 200;
+}
 </script>
 </body>
 </html>
